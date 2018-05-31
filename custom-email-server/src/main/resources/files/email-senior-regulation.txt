@@ -1,0 +1,88 @@
+{
+    "type": "operator",
+    "operator": [
+        {
+            "label": "发件人",
+            "type": "text",
+            "value": "from_recipient:false"
+            "operator": [
+                {
+                    "label": "包含",
+                    "type": "CONTAIN",
+                    "input": "text"
+                },
+                {
+                    "label": "不包含",
+                    "type": "NCONTAIN",
+                    "input": "text"
+                }
+            ]
+        },
+        {
+            "label": "收件人",
+            "type": "text",
+            "value": "to_recipients:false"
+            "operator": [
+                {
+                    "label": "包含",
+                    "type": "CONTAIN",
+                    "input": "text"
+                },
+                {
+                    "label": "不包含",
+                    "type": "NCONTAIN",
+                    "input": "text"
+                }
+            ]
+        },
+        {
+            "label": "主题",
+            "type": "text",
+            "value": "subject:false"
+            "operator": [
+                {
+                    "label": "包含",
+                    "type": "CONTAIN",
+                    "input": "TEXT"
+                },
+                {
+                    "label": "不包含",
+                    "type": "NCONTAIN",
+                    "input": "TEXT"
+                }
+            ]
+        },
+        {
+            "label": "邮件大小",
+            "type": "number",
+            "value": "mail_size:false"
+            "operator": [
+                {
+                    "label": "大于",
+                    "type": "GREATER",
+                    "input": "NUMBER"
+                },
+                {
+                    "label": "小于",
+                    "type": "LESS",
+                    "input": "NUMBER"
+                },
+                {
+                    "label": "等于",
+                    "type": "EQUALS",
+                    "input": "NUMBER"
+                },
+                {
+                    "label": "大于等于",
+                    "type": "GREATERE",
+                    "input": "NUMBER"
+                },
+                {
+                    "label": "小于等于",
+                    "type": "LESSE",
+                    "input": "NUMBER"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="postprocess" code="200">
+		<item ident="database.dead.lock" pre="2" code="0040" msgZh="插入数据死锁" msgEn=""/>
+		<item ident="department.employee.error" pre="2" code="0041" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="department.employee.sucuss" pre="2" code="0042" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="username.password.error" pre="2" code="0001" msgZh="用户名或密码有误" msgEn=""/>
+		<item ident="username.password.number.error" pre="2" code="0002" msgZh="用户名或密码有误3次" msgEn=""/>
+		<item ident="username.password.code.error" pre="2" code="0003" msgZh="标识失效" msgEn=""/>
+		<item ident="username.password.userName.error" pre="2" code="0004" msgZh="没有用户登录" msgEn=""/>
+		<item ident="userName.error" pre="2" code="0005" msgZh="账户不存在 " msgEn=""/>
+		<item ident="userName.disable.error" pre="2" code="0006" msgZh="账户已被禁用 " msgEn=""/>
+		<item ident="push.setting.repeat.error" pre="2" code="0010" msgZh="启用的推送设置类型已存在 " msgEn=""/>
+	</type>
+</service-code>

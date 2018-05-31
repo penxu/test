@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans        
+    	http://www.springframework.org/schema/beans/spring-beans.xsd        
+    	http://code.alibabatech.com/schema/dubbo        
+    	http://code.alibabatech.com/schema/dubbo/dubbo.xsd">
+
+	<dubbo:reference id="mailAccountService" interface="com.teamface.custom.service.email.MailAccountService" />
+	<dubbo:reference id="mailSignatureService" interface="com.teamface.custom.service.email.MailSignatureService" />
+	<dubbo:reference id="mailTagService" interface="com.teamface.custom.service.email.MailTagService" />
+	<dubbo:reference id="mailWhiteBlackService" interface="com.teamface.custom.service.email.MailWhiteBlackService" />
+	<dubbo:reference id="receiveRegulationService" interface="com.teamface.custom.service.email.ReceiveRegulationService" />
+	<dubbo:reference id="mailCatalogService" interface="com.teamface.custom.service.email.MailCatalogService" />
+	<dubbo:reference id="mailLatestAccount" interface="com.teamface.custom.service.email.MailLatestAccount" />
+	<dubbo:reference id="mailOperationService" interface="com.teamface.custom.service.email.MailOperationService" />
+	<dubbo:reference id="mailBackOperationService" interface="com.teamface.custom.service.email.MailBackOperationService" />
+</beans>

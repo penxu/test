@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="postprocess" code="200">
+		<item ident="database.dead.lock" pre="2" code="0040" msgZh="插入数据死锁" msgEn=""/>
+		<item ident="department.employee.error" pre="2" code="0041" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="department.employee.sucuss" pre="2" code="0042" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="username.password.error" pre="2" code="0001" msgZh="用户名或密码有误" msgEn=""/>
+		<item ident="username.password.number.error" pre="2" code="0002" msgZh="用户名或密码有误3次" msgEn=""/>
+		<item ident="username.password.code.error" pre="2" code="0003" msgZh="标识失效" msgEn=""/>
+		<item ident="username.password.userName.error" pre="2" code="0004" msgZh="没有用户登录" msgEn=""/>
+		<item ident="userName.error" pre="2" code="0005" msgZh="账户不存在 " msgEn=""/>
+		<item ident="userName.disable.error" pre="2" code="0006" msgZh="账户已被禁用 " msgEn=""/>
+		<item ident="push.setting.repeat.error" pre="2" code="0010" msgZh="启用的推送设置类型已存在 " msgEn=""/>
+	    <item ident="email.setting.error" pre="2" code="0011" msgZh="邮箱已存在 " msgEn=""/>
+	    <item ident="signature.setting.error" pre="2" code="0012" msgZh="已有默认签名 " msgEn=""/>
+	    <item ident="white.setting.error" pre="2" code="0013" msgZh="名单已存在 " msgEn=""/>
+	    <item ident="signature.existence.error" pre="2" code="0014" msgZh="签名已存在 " msgEn=""/>
+	    <item ident="tag.existence.error" pre="2" code="0015" msgZh="标签已存在 " msgEn=""/>
+	    <item ident="boarder.existence.error" pre="2" code="0016" msgZh="标签颜色已存在 " msgEn=""/>
+	    <item ident="mail.account.existence.error" pre="2" code="0017" msgZh="该账号已存 " msgEn=""/>
+	    <item ident="mail.account.validation.error" pre="2" code="0018" msgZh="验证失败 " msgEn=""/>
+	    <item ident="mail.parameter.error" pre="2" code="0019" msgZh="请求参数错误 " msgEn=""/>
+	</type>
+</service-code>

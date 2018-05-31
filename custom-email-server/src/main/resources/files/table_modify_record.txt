@@ -1,0 +1,9 @@
+1.添加验证通过状态:    alter table mail_account_replace add val_status  char(1) default 0;
+
+2.添加邮件审批流程ID:    alter table mail_box_scope_replace add process_instance_id int4;
+
+3.修改同事圈发布信息的长度为4000:    alter table im_circle_main_replace ALTER column info type varchar(4000);
+
+4.修改同事圈评论信息的长度为1000:    alter table im_circle_comment_replace ALTER column content_info type varchar(2000);
+
+5.修改邮件审批状态值为字符串:    alter table mail_box_scope_replace ALTER column approval_status type varchar(2);

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="postprocess" code="200">
+		<item ident="database.dead.lock" pre="2" code="0040" msgZh="插入数据死锁" msgEn=""/>
+		<item ident="department.employee.error" pre="2" code="0041" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="department.employee.sucuss" pre="2" code="0042" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+	    <item ident="register.user.invite.error" pre="2" code="0043" msgZh="邀请码有误" msgEn=""/>
+	    <item ident="register.user.examine.error" pre="2" code="0044" msgZh="正在审核中，暂时无法登陆" msgEn=""/>
+	    <item ident="register.user.existence" pre="2" code="0045" msgZh="该手机号码已注册" msgEn=""/>
+	    <item ident="open.download.error" pre="2" code="0046" msgZh="需要填写分享密码" msgEn=""/>
+	    <item ident="open.download.time.error" pre="2" code="0047" msgZh="分享链接失效" msgEn=""/>
+	    <item ident="open.download.pwd.error" pre="2" code="0048" msgZh="分享密码验证错误" msgEn=""/>
+	    <item ident="phone.code.error" pre="2" code="0049" msgZh="验证码错误" msgEn=""/>
+	    <item ident="phone.error" pre="2" code="0050" msgZh="手机号码已存在" msgEn=""/>
+	    
+	    <item ident="phone.error" pre="2" code="0100" msgZh="邮件已删除" msgEn=""/>
+	</type>
+</service-code>

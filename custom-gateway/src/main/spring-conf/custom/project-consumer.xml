@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans        
+    	http://www.springframework.org/schema/beans/spring-beans.xsd        
+    	http://code.alibabatech.com/schema/dubbo        
+    	http://code.alibabatech.com/schema/dubbo/dubbo.xsd">
+
+	<dubbo:reference id="projectManagementRoleService" interface="com.teamface.custom.service.project.ProjectManagementRoleService" />
+	<dubbo:reference id="projectManagementLayoutService" interface="com.teamface.custom.service.project.ProjectManagementLayoutService" />
+	<dubbo:reference id="projectManagementWorkflowService" interface="com.teamface.custom.service.project.ProjectManagementWorkflowService" />
+	<dubbo:reference id="projectManagementLayoutOperationService" interface="com.teamface.custom.service.project.ProjectManagementLayoutOperationService" />
+	<dubbo:reference id="projectLibraryService" interface="com.teamface.custom.service.project.ProjectLibraryService" />
+	<dubbo:reference id="projectManagementTagService" interface="com.teamface.custom.service.project.ProjectManagementTagService" />
+	<dubbo:reference id="projectService" interface="com.teamface.custom.service.project.ProjectService" />
+	<dubbo:reference id="projectMemberService" interface="com.teamface.custom.service.project.ProjectMemberService" />
+	<dubbo:reference id="projectSettingService" interface="com.teamface.custom.service.project.ProjectSettingService" />
+	<dubbo:reference id="projectShareService" interface="com.teamface.custom.service.project.ProjectShareService" />
+	<dubbo:reference id="projectWorkbenchService" interface="com.teamface.custom.service.project.ProjectWorkbenchService" />
+    <dubbo:reference id="projectAutomationService" interface="com.teamface.custom.service.project.ProjectAutomationAppService" />
+    <dubbo:reference id="projectTaskService" interface="com.teamface.custom.service.project.ProjectTaskService" />
+    
+</beans>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="common" code="100">
+		<item ident="sucess" pre="" code="1" msgZh="执行成功" msgEn=""/>
+		<item ident="fail" pre="" code="0" msgZh="执行失败" msgEn=""/>
+		<item ident="token.expire" pre="" code="3" msgZh="请重新登入" msgEn=""/>
+		
+		<item ident="noRole" pre="" code="88" msgZh="没有权限" msgEn=""/>
+		<item ident="notOperation" pre="" code="86" msgZh="后台设置固定的审批人不能转办" msgEn=""/>
+		<item ident="isApprove" pre="" code="87" msgZh="您已经操作过，不需要再操作" msgEn=""/>
+		<item ident="noReceiver" pre="" code="89" msgZh="没有设置接收者" msgEn=""/>
+		<item ident="cannot" pre="" code="90" msgZh="不能转给已有的评审人" msgEn=""/>
+		<item ident="noPeople" pre="" code="99" msgZh="没有设置抄送人或者审批人" msgEn=""/>
+		<item ident="system.error" pre="1" code="0001" msgZh="系统错误" msgEn=""/>
+		<item ident="service.unavailable" pre="1" code="0002" msgZh="服务暂停" msgEn=""/>
+		<item ident="remote.service.error" pre="1" code="0003" msgZh="远程服务错误" msgEn=""/>
+		<item ident="ip.limit" pre="1" code="0004" msgZh="IP限制不能请求该资源" msgEn=""/>
+		<item ident="unsupport.mediatype" pre="1" code="0005" msgZh="不支持的媒体类型" msgEn=""/>
+		<item ident="req.param.error" pre="1" code="0006" msgZh="请求参数错误" msgEn=""/>
+		<item ident="system.is.busy" pre="1" code="0007" msgZh="系统繁忙,稍后重试" msgEn=""/>
+		<item ident="system.is.busy" pre="1" code="0008" msgZh="系统繁忙,稍后重试" msgEn=""/>
+		<item ident="job.expired" pre="1" code="0009" msgZh="业务超时" msgEn=""/>
+		<item ident="illegal.request" pre="1" code="0010" msgZh="非法请求" msgEn=""/>
+		<item ident="username.password.error" pre="1" code="0011" msgZh="用户名密码错误" msgEn=""/>
+		<item ident="phone.has.used" pre="1" code="0012" msgZh="该手机号已经被使用" msgEn=""/>
+		<item ident="user.has.bind.phone" pre="1" code="0013" msgZh="该用户已经绑定手机" msgEn=""/>
+		<item ident="image.size.too.large" pre="1" code="0014" msgZh="图片太大" msgEn=""/>
+		<item ident="file.size.too.large" pre="1" code="0014" msgZh="文件太大" msgEn=""/>
+		<item ident="user.not.exist" pre="1" code="0015" msgZh="用户不存在" msgEn=""/>
+		<item ident="unsuppor.image.type" pre="1" code="0016" msgZh="不支持的图片类型" msgEn=""/>
+		<item ident="unsuppor.file.type" pre="1" code="0017" msgZh="不支持的文件类型" msgEn=""/>
+		<item ident="domain.not.exist" pre="1" code="0018" msgZh="域名不存在" msgEn=""/>
+		<item ident="ciphertext.expire" pre="1" code="0019" msgZh="密文已过期" msgEn=""/>
+		<item ident="captcha.error" pre="1" code="0020" msgZh="验证码输入错误" msgEn=""/>
+		<item ident="user.exist" pre="1" code="0021" msgZh="该用户已存在" msgEn=""/>
+		<item ident="user.forbid.login" pre="1" code="0022" msgZh="该用户禁止登入" msgEn=""/>
+		<item ident="find.passwd.err" pre="1" code="0023" msgZh="找回密码错误" msgEn=""/>
+		<item ident="token.not.exist" pre="1" code="0024" msgZh="令牌不存在" msgEn=""/>
+		<item ident="not.reused.reset.passwd" pre="1" code="0025" msgZh="不能重复设置密码" msgEn=""/>
+		<item ident="not.exist" pre="1" code="0027" msgZh="查询无记录" msgEn=""/>
+		<item ident="captcha.not.exist" pre="1" code="0028" msgZh="验证码不存在" msgEn=""/>
+		<item ident="upload.file.type.err" pre="1" code="0029" msgZh="抱歉！不支持此类文件上传" msgEn=""/>
+		<item ident="upload.file.size.zero" pre="1" code="0030" msgZh="不能上传空文件" msgEn=""/>
+		<item ident="upload.file.interrupt" pre="1" code="0031" msgZh="上传文件中断，请检查网络！" msgEn=""/>
+		<item ident="token.expired" pre="1" code="0032" msgZh="令牌已失效" msgEn=""/>
+		<item ident="not.repetition.upvote" pre="1" code="0033" msgZh="不能重复点赞" msgEn=""/>
+		<item ident="employee.exist" pre="1" code="0034" msgZh="成员已存在" msgEn=""/>
+		<item ident="person.message.not.exist" pre="1" code="0035" msgZh="个人信息没完善" msgEn=""/>
+		<item ident="code.over.time" pre="1" code="0036" msgZh="验证码已过期" msgEn=""/>
+		<item ident="user.captcha.too.often" pre="1" code="0038" msgZh="验证码发送太频繁" msgEn=""/>
+		<item ident="not.stop.creater" pre="1" code="0039" msgZh="不能停用公司的创建者" msgEn=""/>
+		<item ident="not.default.role" pre="1" code="0089" msgZh="不是默认的角色不能重置" msgEn=""/>
+		<item ident="is.not.exit" pre="1" code="166" msgZh="数据不存在" msgEn=""/>
+		<item ident="son.is.exit" pre="1" code="128" msgZh="还存在子数据不能删除" msgEn=""/>
+		<item ident="activity.is.approve" pre="1" code="129" msgZh="市场活动已审批" msgEn=""/>
+		<item ident="activity.is.termination" pre="1" code="130" msgZh="市场活动已终止" msgEn=""/>
+		<item ident="activity.is.finished" pre="1" code="131" msgZh="市场活动已完成不允许终止" msgEn=""/>
+		<item ident="quote.is.waste" pre="1" code="132" msgZh="报价已作废" msgEn=""/>
+		<item ident="quote.is.finished" pre="1" code="133" msgZh="报价已完成不允许作废" msgEn=""/>
+		<item ident="quote.not.deleted" pre="1" code="134" msgZh="报价作废才允许删除" msgEn=""/>
+		<item ident="contract.is.termination" pre="1" code="135" msgZh="合同已终止" msgEn=""/>
+		<item ident="contract.is.finished" pre="1" code="136" msgZh="合同已完成不允许终止" msgEn=""/>
+		<item ident="quote.not.finished" pre="1" code="137" msgZh="报价审核通过才允许转订单" msgEn=""/>
+		<item ident="layout.not.extend" pre="1" code="138" msgZh="页面已产生布局不能新增字段" msgEn=""/>
+		<item ident="menu.is.default.cantsort" pre="1" code="139" msgZh="不能对默认菜单进行排序" msgEn=""/>
+		<item ident="menu.is.default.del" pre="1" code="140" msgZh="不能对默认菜单进行删除" msgEn=""/>
+		<item ident="menu.is.edit.by.created" pre="1" code="141" msgZh="只有创建者才可以编辑" msgEn=""/>
+		<item ident="application.name.is.exist" pre="1" code="142" msgZh="应用名称已经存在" msgEn=""/>
+		<item ident="application.module.need.exist" pre="1" code="143" msgZh="应用至少需要一个模块才能上传模板" msgEn=""/>
+		<item ident="application.module.exist" pre="1" code="144" msgZh="当前应用下存在模块，删除失败" msgEn=""/>
+		<item ident="user.role.has.employee" pre="1" code="145" msgZh="当前角色拥有员工，不能删除。请把该角色下的员工移到别的角色，才可以删除！" msgEn=""/>
+		<item ident="exist.instrument.name" pre="1" code="146" msgZh="仪表盘名称已经存在!" msgEn=""/>
+		<item ident="chat.is.exist" pre="1" code="150" msgZh="个聊信息已建立" msgEn=""/>
+		<item ident="upload.file.size.error" pre="1" code="151" msgZh="文件大小超过限制" msgEn=""/>
+		<item ident="account.examine.susses" pre="1" code="152" msgZh="账号已提交审核,请稍后" msgEn=""/>
+		<item ident="account.error" pre="1" code="153" msgZh="账号不存在" msgEn=""/>
+		<item ident="seapool.name.is.exist" pre="1" code="154" msgZh="公海池名称已经存在" msgEn=""/>
+		<item ident="upload.file.auth.error" pre="1" code="155" msgZh="没有权限执行此操作" msgEn=""/>
+		<item ident="user.role.has.childrole" pre="1" code="155" msgZh="当前分组下存在角色名称，请删除角色名称后再删除分组。" msgEn=""/>
+
+	</type>
+</service-code>

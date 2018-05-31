@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="postprocess" code="200">
+		<item ident="database.dead.lock" pre="2" code="0040" msgZh="插入数据死锁" msgEn=""/>
+		<item ident="department.employee.error" pre="2" code="0041" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="department.employee.sucuss" pre="2" code="0042" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="file.library.error" pre="3" code="0043" msgZh="没有权限移动或复制此文件 " msgEn=""/>
+	</type>
+</service-code>

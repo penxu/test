@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-code>
+    <!-- 错误码标识等于id加"."加子节点ident; 错误码标识等于code加子节点pre加code-->
+	<type id="postprocess" code="201">
+		<item ident="database.dead.lock" pre="2" code="0040" msgZh="插入数据死锁" msgEn=""/>
+		<item ident="department.employee.error" pre="2" code="0041" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="department.employee.sucuss" pre="2" code="0042" msgZh="该部门下还有员工,请先将员工部门进行调整再删除部门" msgEn=""/>
+		<item ident="username.password.error" pre="2" code="0001" msgZh="用户名或密码有误" msgEn=""/>
+		<item ident="username.password.number.error" pre="2" code="0002" msgZh="用户名或密码有误3次" msgEn=""/>
+		<item ident="username.password.code.error" pre="2" code="0003" msgZh="标识失效" msgEn=""/>
+		<item ident="username.password.userName.error" pre="2" code="0004" msgZh="没有用户登录" msgEn=""/>
+		<item ident="userName.error" pre="2" code="0005" msgZh="账户不存在 " msgEn=""/>
+		<item ident="userName.disable.error" pre="2" code="0006" msgZh="账户已被禁用 " msgEn=""/>
+		<item ident="push.setting.repeat.error" pre="2" code="0010" msgZh="启用的推送设置类型已存在 " msgEn=""/>
+		<item ident="register.user.invite.error" pre="2" code="0011" msgZh="邀请码不可用 " msgEn=""/>
+		<item ident="register.user.error" pre="2" code="0012" msgZh="账号已存在 " msgEn=""/>
+	    <item ident="user.auth.error" pre="2" code="0013" msgZh="无权限操作 " msgEn=""/>
+	    <item ident="user.register.error" pre="2" code="0014" msgZh="账户审核中,请耐心等待，或联系客服 " msgEn=""/>
+	    <item ident="application.order.error" pre="2" code="0015" msgZh="序号已存在 " msgEn=""/>
+	    <item ident="company.ip.error" pre="2" code="0016" msgZh="ip设置已存在 " msgEn=""/>
+	    <item ident="account.lock.error" pre="2" code="0017" msgZh="账号锁定15分钟 " msgEn=""/>
+	    <item ident="account.phone.error" pre="2" code="0018" msgZh="账号验证手机号码 " msgEn=""/>
+	    <item ident="ip.limit.error" pre="2" code="0019" msgZh="ip登录限制,请联系管理员 " msgEn=""/>
+	    <item ident="company.set.error" pre="2" code="0020" msgZh="公司套餐已到期!请联系管理员 " msgEn=""/>
+	</type>
+</service-code>

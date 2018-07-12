@@ -143,6 +143,13 @@ public class UserAsyncHandle
                     }
                     else
                     {
+                        StringBuilder  editBuilder = new  StringBuilder();
+                        editBuilder.append(" update account set login_pwd = '");
+                        editBuilder.append(jsonObject.getString("user_pwd"));
+                        editBuilder.append("' where  id = ");
+                        editBuilder.append(jsonMap.getLong("id"));
+                        int number = DAOUtil.executeUpdate(editBuilder.toString());
+                        log.debug("审核通过修改账号表信息======" + number);
                         accountId = jsonMap.getLong("id");
                     }
                     // 查询可用公司

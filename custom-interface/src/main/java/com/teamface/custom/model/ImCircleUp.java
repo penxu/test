@@ -40,9 +40,9 @@ public class ImCircleUp extends BaseVo implements java.io.Serializable
         this.circleMainId = circleMainId;
     }
     
+    @Override
     public String toString()
     {
-        return "[" + "employeeId:" + getEmployeeId() + "," + "circleMainId:"
-            + getCircleMainId() + "," + "]";
+        return "[" + "employeeId:" + getEmployeeId() + "," + "circleMainId:" + getCircleMainId() + "," + "]";
     }
 }

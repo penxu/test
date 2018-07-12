@@ -74,7 +74,7 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                 String bean = jsonObject.getString("english_name");
                 buff.append(jsonObject.getString("parent_id")).append(Constant.APPLY_NAME).append("/").append(bean).append("/");
             }
-            boolean flag = OSSUtil.getInstance().createLibraryFile(buff.toString());
+            boolean flag = OSSUtil.getInstance().addFolder(Constant.FLIE_LIBRARY_NAME, buff.toString());
             if (flag)
             {
                 String catalogTable = DAOUtil.getTableName("catalog", info.getCompanyId());
@@ -448,7 +448,7 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                 }
             }
             LOG.debug("进入创建文件夹==============================");
-            boolean flag = OSSUtil.getInstance().createLibraryFile(buff.toString()); // oss创建目录
+            boolean flag = OSSUtil.getInstance().addFolder(Constant.FLIE_LIBRARY_NAME, buff.toString()); // oss创建目录
             LOG.debug("创建成功==============================" + flag);
             if (!flag)
             {
@@ -518,7 +518,7 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
             StringBuilder deleteBuf = new StringBuilder("delete from ").append(shareTable).append(" where file_id=").append(map.get("id"));
             int number = DAOUtil.executeUpdate(deleteBuf.toString());
             LOG.debug("删除文件" + number);
-            boolean flag = OSSUtil.getInstance().delLibraryFile(jsonObject.getString("url"));
+            boolean flag = OSSUtil.getInstance().deleteObject(Constant.FLIE_LIBRARY_NAME, jsonObject.getString("url")); // delLibraryFile(jsonObject.getString("url"));
             if (!flag)
             {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
@@ -640,8 +640,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
-            
-            boolean flag = OSSUtil.getInstance().copyLibraryFile(url, furl);
+            boolean flag = OSSUtil.getInstance().copyObject(Constant.FLIE_LIBRARY_NAME, url, Constant.FLIE_LIBRARY_NAME, furl);
+            // boolean flag = OSSUtil.getInstance().copyLibraryFile(url, furl);
             if (!flag)
             {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
@@ -771,7 +771,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                 }
             }
             
-            boolean flag = OSSUtil.getInstance().copyLibraryFile(url, furl);
+            boolean flag = OSSUtil.getInstance().copyObject(Constant.FLIE_LIBRARY_NAME, url, Constant.FLIE_LIBRARY_NAME, furl); // .copyLibraryFile(url,
+                                                                                                                                // furl);
             if (!flag)
             {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
@@ -2023,39 +2024,84 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         Long employeeId = info.getEmployeeId();
-        if (id == Constant.LIBRARY_COMPANY_CATALOG)
+        if (id == Constant.LIBRARY_COMPANY_CATALOG) // 公司文件夹
         {
             if (Objects.isNull(fileId))
+            {
                 return SearchLibFile.searchCompanyFile(companyId, id, employeeId, content);
+            }
             else
+            {
                 return SearchLibFile.searchCompanyFile(companyId, id, employeeId, content, fileId);
+            }
+            
         }
         StringBuilder searchBlurQuerySB = new StringBuilder();
-        if (id == Constant.LIBRARY_APPLICATION_CATALOG || id == Constant.LIBRARY_PERSONAL_CATALOG)
+        if (id == Constant.LIBRARY_PERSONAL_CATALOG) // 个人文件夹
         {
-            searchBlurQuerySB.append("select c.*,e.employee_name from catalog_")
-                .append(companyId)
-                .append(" c join employee_")
-                .append(companyId)
-                .append(" e on c.create_by = e.id where c.name like '%")
-                .append(content)
-                .append("%' and c.table_id = ")
-                .append(id)
-                .append(" order by c.id");
+            searchBlurQuerySB.append("select c.*,e.employee_name from catalog_").append(companyId).append(" c join employee_");
+            searchBlurQuerySB.append(companyId).append(" e on c.create_by = e.id where c.name like '%").append(content);
+            searchBlurQuerySB.append("%' and c.table_id = ").append(id).append(" and c.create_by =").append(employeeId);
+            if (!Objects.isNull(fileId))
+            {
+                String dataId = BusinessDAOUtil.getFileDepments(companyId, fileId, Constant.CURRENCY_ONE, "catalog");
+                searchBlurQuerySB.append(" and c.id in ( ").append(dataId).append(") ");
+            }
+            searchBlurQuerySB.append(" order by c.id");
         }
-        if (id == Constant.LIBRARY_SHARETO_CATALOG)
+        if (id == Constant.LIBRARY_APPLICATION_CATALOG) // 应用文件夹
+        {
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("token", token);
+            jsonObject.put("module_id", fileId);
+            String dataId = moduleDataAuthAppService.getModuleDataByAuthModule(jsonObject); // 获取模块下能看到的文件
+            if (StringUtils.isEmpty(dataId))
+            {
+                return null;
+            }
+            String catalogTable = DAOUtil.getTableName("catalog", info.getCompanyId());
+            String employeeTable = DAOUtil.getTableName("employee", info.getCompanyId());
+            searchBlurQuerySB.append("select c.*,e.employee_name,e.picture from  ");
+            searchBlurQuerySB.append(catalogTable);
+            searchBlurQuerySB.append(" c  left join ");
+            searchBlurQuerySB.append(employeeTable);
+            searchBlurQuerySB.append(" e on c.create_by = e.id  where   c.status = ");
+            searchBlurQuerySB.append(Constant.CURRENCY_ZERO);
+            searchBlurQuerySB.append(" and c.table_id =");
+            searchBlurQuerySB.append(id);
+            searchBlurQuerySB.append("  and c.parent_id =");
+            searchBlurQuerySB.append(fileId);
+            searchBlurQuerySB.append(" and  model_id in (");
+            searchBlurQuerySB.append(dataId);
+            searchBlurQuerySB.append(") and c.type = ");
+            searchBlurQuerySB.append(Constant.CURRENCY_TWO);
+            searchBlurQuerySB.append("  and c.name like '%");
+            searchBlurQuerySB.append(content);
+            searchBlurQuerySB.append("%' order by c.id asc");
+        }
+        if (id == Constant.LIBRARY_SHARETO_CATALOG) // 我共享的
         {
             if (Objects.isNull(fileId))
+            {
                 return SearchLibFile.searchShareToFile(companyId, id, employeeId, content);
+            }
             else
+            {
                 return SearchLibFile.searchShareFile(companyId, id, employeeId, content, fileId);
+            }
+            
         }
-        if (id == Constant.LIBRARY_TOSHARE_CATALOG)
+        if (id == Constant.LIBRARY_TOSHARE_CATALOG) // 与我共享
         {
             if (Objects.isNull(fileId))
+            {
                 return SearchLibFile.searchToShareFile(companyId, id, employeeId, content);
+            }
             else
+            {
                 return SearchLibFile.searchShareFile(companyId, id, employeeId, content, fileId);
+            }
+            
         }
         return DAOUtil.executeQuery4JSON(searchBlurQuerySB.toString());
     }
@@ -2604,7 +2650,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
         if (null == jsonObject)
         {
-            resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+            //无权限
+            resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);
         }
         else
         {
@@ -2645,7 +2692,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
         if (null == jsonObject)
         {
-            resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+            //无权限
+            resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);
         }
         else
         {
@@ -2681,7 +2729,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         String id = moduleDataAuthAppService.getModuleDataByAuthModule(jsonObject);
         if (StringUtils.isBlank(id))// 是否有权限
         {
-            resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+            //无权限
+            resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);  
         }
         else
         {
@@ -2717,7 +2766,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         String str = BusinessDAOUtil.getFileDepments(info.getCompanyId(), Long.parseLong(map.get("id").toString()), 0, "catalog");
         if (StringUtils.isBlank(str))
         {
-            resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+          //无权限
+            resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);
             return resultJsonObject;
         }
         String id = str.substring(0, str.indexOf(',')); // 获取顶级文件夹
@@ -2727,7 +2777,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
         if (null == jsonObject)
         { // 查询文件属性 是公开还是私有
-            resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+             //无权限
+            resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);
             return resultJsonObject;
         }
         if (jsonObject.getInteger("type") == Constant.CURRENCY_ZERO)
@@ -2747,7 +2798,8 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                 JSONObject json = DAOUtil.executeQuery4FirstJSON(buf.toString());
                 if (null == json)
                 { // 查询是否是成员
-                    resultJsonObject.put("readAuth", Constant.CURRENCY_ZERO);
+                    // 无权限
+                    resultJsonObject.put("readAuth", Constant.CURRENCY_ONE);
                 }
                 else
                 {
@@ -3324,7 +3376,7 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
      * @Description:
      */
     @Override
-    public boolean vailFileAuth(String token, Long id, int type)
+    public boolean vailFileAuth(String token, Long id)
     {
         try
         {
@@ -3369,16 +3421,9 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
                     buf.append(dataId);
                     buf.append(" and  employee_id = ");
                     buf.append(info.getEmployeeId());
-                    if (type == Constant.CURRENCY_ZERO)
-                    {
-                        buf.append(" and upload= ");
-                        buf.append(Constant.CURRENCY_ONE);
-                    }
-                    else if (type == Constant.CURRENCY_ONE)
-                    {
-                        buf.append(" and download = ");
-                        buf.append(Constant.CURRENCY_ONE);
-                    }
+                    buf.append(" and download = ");
+                    buf.append(Constant.CURRENCY_ONE);
+                    
                     int sum = DAOUtil.executeCount(buf.toString());
                     if (sum <= 0)
                     { // 查询是否是成员
@@ -3467,6 +3512,82 @@ public class FileLibraryAppServiceImpl implements FileLibraryAppService
         }
         json.put("mailAuth", Constant.CURRENCY_ONE);
         return json;
+    }
+    
+    /**
+     * 验证上传是否拥有权限
+     * 
+     * @param token
+     * @param id
+     * @return
+     * @Description:
+     */
+    @Override
+    public boolean vailFileUploadAuth(String token, Long id, String type)
+    {
+        try
+        {
+            if (Integer.parseInt(type) == Constant.CURRENCY_ONE)
+            {
+                InfoVo info = TokenMgr.obtainInfo(token);
+                String catalogTable = DAOUtil.getTableName("catalog", info.getCompanyId());
+                String manageTable = DAOUtil.getTableName("catalog_manage", info.getCompanyId());
+                String settingTable = DAOUtil.getTableName("catalog_setting", info.getCompanyId());
+                StringBuilder queryBuilder =
+                    new StringBuilder("select * from ").append(catalogTable).append(" where id = ").append(id).append(" and status =").append(Constant.CURRENCY_ZERO);
+                JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString()); // 查询
+                if (jsonObject.getInteger("table_id") == 1)// 公司文件
+                {
+                    StringBuilder queryCountBuilder = new StringBuilder();
+                    queryCountBuilder.append("select count(1) from ");
+                    queryCountBuilder.append(manageTable);
+                    queryCountBuilder.append(" where file_id = ");
+                    queryCountBuilder.append(id);
+                    queryCountBuilder.append(" and employee_id = ");
+                    queryCountBuilder.append(info.getEmployeeId());
+                    // 查询是否有权限操作
+                    int number = DAOUtil.executeCount(queryCountBuilder.toString());
+                    if (number <= 0)
+                    {
+                        String str = BusinessDAOUtil.getFileDepments(info.getCompanyId(), id, 0, "catalog");
+                        if (StringUtils.isBlank(str))
+                        {
+                            return false;
+                        }
+                        String dataId;
+                        if (str.indexOf(',') > -1)
+                        {
+                            dataId = str.substring(0, str.indexOf(',')); // 获取顶级文件夹
+                        }
+                        else
+                        {
+                            dataId = str;
+                        }
+                        StringBuilder buf = new StringBuilder();
+                        buf.append("select count(*) from ");
+                        buf.append(settingTable);
+                        buf.append(" where file_id = ");
+                        buf.append(dataId);
+                        buf.append(" and  employee_id = ");
+                        buf.append(info.getEmployeeId());
+                        buf.append(" and upload= ");
+                        buf.append(Constant.CURRENCY_ONE);
+                        
+                        int sum = DAOUtil.executeCount(buf.toString());
+                        if (sum <= 0)
+                        { // 查询是否是成员
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+            return false;
+        }
+        return true;
     }
     
 }

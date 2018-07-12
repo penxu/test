@@ -45,7 +45,7 @@ public class ReportUtil
     
     public String PREFIX_FIELD = "bean";
     
-    public String NULL_VALUE_FLAG = "未填写";
+    public String NULL_VALUE_FLAG = "未知";
     
     public String FIELD_COUNT = "count";
     
@@ -1327,7 +1327,9 @@ public class ReportUtil
             {
                 flag = false;
                 if (!first)
+                {
                     break;
+                }
             }
             else if (!first)
             {
@@ -1522,7 +1524,7 @@ public class ReportUtil
             }
             mdataJson.put(keyArr[1], value);
             Double maxSum = maxSumJson.getDouble(keyArr[1]);
-            maxSum = maxSum == null ? 0l : maxSum;
+            maxSum = maxSum == null ? 0L : maxSum;
             maxSumJson.put(keyArr[1], value + maxSum);
         }
         sdataMap.put(KEY_MAX_SUM_KEY, maxSumJson);
@@ -1600,7 +1602,7 @@ public class ReportUtil
                 String queryField = new StringBuilder(otherTable).append(".").append(fieldName).toString();
                 String asField = new StringBuilder(otherTable).append("_").append(fieldName).toString();
                 // postgre字段名长度限制64且字段名需字母开头
-                asField = asField.replace("_approval_", "_");
+                asField = asField.replace("_approval_", "_").replace("_subform_", "_");
                 asField = asField.length() > 64 ? asField.substring(0, 63) : asField;
                 
                 if (querySourceModules.indexOf(otherTable) == -1)
@@ -1867,7 +1869,7 @@ public class ReportUtil
                         .append("_")
                         .append(sourceName.replace(Constant.TYPE_AREA_DISTRICT, Constant.TYPE_AREA_CITY))
                         .toString();
-                    xfieldName = xfieldName.replace("_approval_", "_");
+                    xfieldName = xfieldName.replace("_approval_", "_").replace("_subform_", "_");
                     xfieldName = xfieldName.length() > 64 ? xfieldName.substring(0, 63) : xfieldName;
                     xfields.add(xfieldName);
                 }
@@ -1881,12 +1883,12 @@ public class ReportUtil
                         .append("_")
                         .append(Constant.TYPE_AREA_CITY)
                         .toString();
-                    xfieldName = xfieldName.replace("_approval_", "_");
+                    xfieldName = xfieldName.replace("_approval_", "_").replace("_subform_", "_");
                     xfieldName = xfieldName.length() > 64 ? xfieldName.substring(0, 63) : xfieldName;
                     xfields.add(xfieldName);
                 }
                 String xfieldName = new StringBuilder(tmpXfields.getString("bean")).append("_").append(companyId).append("_").append(sourceName).toString();
-                xfieldName = xfieldName.replace("_approval_", "_");
+                xfieldName = xfieldName.replace("_approval_", "_").replace("_subform_", "_");
                 xfieldName = xfieldName.length() > 64 ? xfieldName.substring(0, 63) : xfieldName;
                 xfields.add(xfieldName);
             }
@@ -1899,7 +1901,7 @@ public class ReportUtil
                 else
                 {
                     String yfieldName = new StringBuilder(tmpYfields.getString("bean")).append("_").append(companyId).append("_").append(tmpYfields.getString("name")).toString();
-                    yfieldName = yfieldName.replace("_approval_", "_");
+                    yfieldName = yfieldName.replace("_approval_", "_").replace("_subform_", "_");
                     yfieldName = yfieldName.length() > 64 ? yfieldName.substring(0, 63) : yfieldName;
                     yfields.add(yfieldName);
                 }
@@ -1992,7 +1994,7 @@ public class ReportUtil
             String queryField = new StringBuilder(otherTable).append(".").append(fieldName).toString();
             String asField = new StringBuilder(otherTable).append("_").append(fieldName).toString();
             // postgre字段名长度限制64且字段名需字母开头
-            asField = asField.replace("_approval_", "_");
+            asField = asField.replace("_approval_", "_").replace("_subform_", "_");
             asField = asField.length() > 64 ? asField.substring(0, 63) : asField;
             
             /***** 添加表（如已存在就不添加了） *****/
@@ -2268,7 +2270,7 @@ public class ReportUtil
             JSONObject allFieldJson = (JSONObject)allFieldObj;
             String allFieldName = allFieldJson.getString("name");
             String asfieldName = new StringBuilder(allFieldJson.getString("bean")).append("_").append(companyId).append("_").append(allFieldName).toString();
-            asfieldName = asfieldName.replace("_approval_", "_");
+            asfieldName = asfieldName.replace("_approval_", "_").replace("_subform_", "_");
             asfieldName = asfieldName.length() > 64 ? asfieldName.substring(0, 63) : asfieldName;
             fieldLableMap.put(asfieldName, allFieldJson.getString("label"));
             if (allFieldName.equals("recordNumber"))
@@ -2285,7 +2287,7 @@ public class ReportUtil
             JSONObject tmpXfields = (JSONObject)tmpObj;
             String sourceName = tmpXfields.getString("name");
             String xfieldName = new StringBuilder(tmpXfields.getString("bean")).append("_").append(companyId).append("_").append(sourceName).toString();
-            xfieldName = xfieldName.replace("_approval_", "_");
+            xfieldName = xfieldName.replace("_approval_", "_").replace("_subform_", "_");
             xfieldName = xfieldName.length() > 64 ? xfieldName.substring(0, 63) : xfieldName;
             xfields.add(xfieldName);
         }
@@ -2294,7 +2296,7 @@ public class ReportUtil
             JSONObject tmpCfields = (JSONObject)tmpObj;
             String sourceName = tmpCfields.getString("name");
             String cfieldName = new StringBuilder(tmpCfields.getString("bean")).append("_").append(companyId).append("_").append(sourceName).toString();
-            cfieldName = cfieldName.replace("_approval_", "_");
+            cfieldName = cfieldName.replace("_approval_", "_").replace("_subform_", "_");
             cfieldName = cfieldName.length() > 64 ? cfieldName.substring(0, 63) : cfieldName;
             cfields.add(cfieldName);
         }
@@ -2309,7 +2311,7 @@ public class ReportUtil
             else
             {
                 String yfieldName = new StringBuilder(tmpYfields.getString("bean")).append("_").append(companyId).append("_").append(sourceName).toString();
-                yfieldName = yfieldName.replace("_approval_", "_");
+                yfieldName = yfieldName.replace("_approval_", "_").replace("_subform_", "_");
                 yfieldName = yfieldName.length() > 64 ? yfieldName.substring(0, 63) : yfieldName;
                 yfields.add(yfieldName);
             }

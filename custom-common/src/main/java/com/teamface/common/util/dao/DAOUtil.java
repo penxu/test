@@ -13,6 +13,7 @@ import org.apache.log4j.Logger;
 import org.springframework.jdbc.core.ColumnMapRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
+import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSONArray;
@@ -253,8 +254,12 @@ public class DAOUtil
         }
         try
         {
-            Number number = jdbc.queryForObject(sql, Integer.class);
-            return (number != null ? number.intValue() : 0);
+            SqlRowSet rs = jdbc.queryForRowSet(sql);
+            if (rs.next())
+            {
+                return rs.getInt(1);
+            }
+            return 0;
         }
         catch (Exception e)
         {
@@ -271,7 +276,11 @@ public class DAOUtil
         }
         try
         {
-            return jdbc.queryForObject(sql, Object.class);
+            SqlRowSet rs = jdbc.queryForRowSet(sql);
+            if (rs.next())
+            {
+                return rs.getObject(1);
+            }
         }
         catch (Exception e)
         {

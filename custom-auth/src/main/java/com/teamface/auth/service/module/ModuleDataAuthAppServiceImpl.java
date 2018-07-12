@@ -1621,7 +1621,7 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
             
             // 组装sql
             StringBuilder querySql = new StringBuilder();
-            querySql.append("select t1. ID,	t1.role_id,	t1.module_id, t1.func_id, t1.auth_code,	t2.data_auth, t3.func_name,	t4.english_name as bean_name from ");
+            querySql.append("select t1. ID, t1.role_id, t1.module_id, t1.func_id, t1.auth_code, t2.data_auth, t3.func_name, t4.english_name as bean_name from ");
             querySql.append(moduleFuncTable);
             querySql.append(" t1, ");
             querySql.append(roleModuleTable);
@@ -2006,6 +2006,70 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
         
     }
     
+    /**
+     * 获取数据共享sql
+     * 
+     * @param map
+     * @return
+     * @Description:
+     */
+    private String getShareData(Map<String, String> map)
+    {
+        
+        log.debug(String.format(" getShareData parameters{args0:%s} start!", map.toString()));
+        String bean = map.get("bean");
+        if (StringUtils.isEmpty(bean))
+        {
+            return "";
+        }
+        String table = DAOUtil.getTableName("module_data_share_setting", map.get("companyId"));
+        StringBuilder sql = new StringBuilder();
+        sql.append("select string_agg(module_id,',') from ")
+            .append(table)
+            .append(" where ")
+            .append(Constant.FIELD_DEL_STATUS)
+            .append("=0 and bean_name='")
+            .append(bean)
+            .append("'");
+        sql.append(" and ( ");
+        String departmentIdStr = map.get("departmentIds");
+        String companyId = map.get("companyId");
+        String employeeId = map.get("employeeId");
+        String roleId = map.get("roleId");
+        StringBuilder where = new StringBuilder();
+        if (!StringUtils.isEmpty(departmentIdStr))
+        {
+            
+            String[] departmentIds = departmentIdStr.split(",");
+            Set<String> idSet = new HashSet<String>();
+            for (String did : departmentIds)
+            {
+                if (!idSet.contains(did))
+                {
+                    idSet.add(did);
+                    if (where.length() > 0)
+                    {
+                        where.append(" or ");
+                    }
+                    where.append(" position('").append("0-").append(did).append("' in ").append("allot_employee_v").append(" )>0");
+                }
+            }
+        }
+        if (where.length() > 0)
+        {
+            where.append(" or position('").append("1-").append(employeeId).append("' in ").append("allot_employee_v").append(" )>0");
+        }
+        else
+        {
+            where.append(" position('").append("1-").append(employeeId).append("' in ").append("allot_employee_v").append(" )>0");
+        }
+        where.append(" or position('").append("2-").append(roleId).append("' in ").append("allot_employee_v").append(" )>0");
+        where.append(" or position('").append("4-").append(companyId).append("' in ").append("allot_employee_v").append(" )>0");
+        sql.append(where).append(" ) ");
+        return DAOUtil.executeQuery4Object(sql.toString(), String.class);
+        
+    }
+    
     @Override
     public JSONObject getReadAuthByModule(String moduleId, String moduleBean, String dataId, String token)
     {
@@ -2023,6 +2087,7 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
         InfoVo info = TokenMgr.obtainInfo(token);
         // 公司id
         Long companyId = info.getCompanyId();
+        Long employeeId = info.getEmployeeId();
         JSONObject roleJson = this.getRoleByUser(token);
         if (roleJson == null || roleJson.isEmpty())
         {
@@ -2033,6 +2098,7 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
         String moduleTable = DAOUtil.getTableName("application_module", companyId);
         if (StringUtils.isEmpty(moduleId))
         {
+            // 获取模块id
             StringBuilder builder = new StringBuilder();
             builder.append(" select id from ").append(moduleTable).append(" where english_name='").append(moduleBean).append("'").append(" and del_status=0 ");
             JSONObject object = DAOUtil.executeQuery4FirstJSON(builder.toString());
@@ -2043,10 +2109,133 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
             }
             moduleId = object.get("id").toString();
         }
-        else
+        // 权限控制
+        StringBuilder menuSql = new StringBuilder();
+        String data_auth = getDataAuthByRoleModule(companyId.toString(), employeeId.toString(), moduleId);
+        if (data_auth != null)
         {
+            if (Constant.DATA_AUTH_EMPLOYEE.equals(data_auth))
+            {
+                menuSql.append(" and t_main.personnel_principal = ").append(employeeId);
+            }
+            else if (Constant.DATA_AUTH_DEPARTMENT.equals(data_auth))
+            {
+                
+                StringBuilder employeesString = new StringBuilder();
+                List<JSONObject> employeeIds = employeeAppService.queryDepartmentAuthEmployee(companyId.toString(), employeeId.toString());
+                for (JSONObject object : employeeIds)
+                {
+                    if (employeesString.length() > 0)
+                    {
+                        employeesString.append(",");
+                    }
+                    employeesString.append("'").append(object.getString("employee_id")).append("'");
+                }
+                if (employeesString.length() > 0)
+                {
+                    menuSql.append(" and t_main.personnel_principal in (").append(employeesString).append(")");
+                }
+            }
+            else if (Constant.DATA_AUTH_COMPANY.equals(data_auth))
+            {
+                // 查看企业的不用管，就是查看所有
+            }
+        }
+        
+        Map<String, Object> emap = new HashMap<>();
+        emap.put("employee_id", employeeId);
+        emap.put("token", token);
+        String departmentIds = employeeAppService.getdepartmentIds(String.valueOf(employeeId), String.valueOf(companyId));
+        Integer roleId = roleJson.getInteger("id");
+        // 获取模块单条数据共享
+        Map<String, String> reqmap = new HashMap<>();
+        reqmap.put("companyId", companyId.toString());
+        reqmap.put("employeeId", employeeId.toString());
+        reqmap.put("bean", moduleBean);
+        reqmap.put("departmentIds", departmentIds);
+        reqmap.put("roleId", roleId.toString());
+        String shareIds = getShareData(reqmap);
+        // 模块共享条件
+        StringBuilder module_share = new StringBuilder();
+        boolean shareButNotCondition = false;
+        // 获取模块共享设置
+        String shareTable = DAOUtil.getTableName("module_share_setting", companyId);
+        StringBuilder shareBuilder = new StringBuilder();
+        shareBuilder.append("select * from ").append(shareTable).append(" where ").append(Constant.FIELD_DEL_STATUS).append("=0 and bean_name='").append(moduleBean).append("'");
+        String[] departIds = departmentIds.split(",");
+        Set<String> idSet = new HashSet<String>();
+        StringBuilder where = new StringBuilder();
+        for (String did : departIds)
+        {
+            if (!idSet.contains(did))
+            {
+                idSet.add(did);
+                if (where.length() > 0)
+                {
+                    where.append(" or ");
+                }
+                where.append(" position('").append("0-").append(did).append("' in ").append("allot_employee_v").append(" )>0");
+            }
+        }
+        where.append(" or position('").append("1-").append(employeeId).append("' in ").append("allot_employee_v").append(" )>0");
+        where.append(" or position('").append("2-").append(roleId).append("' in ").append("allot_employee_v").append(" )>0");
+        where.append(" or position('").append("4-").append(companyId).append("' in ").append("allot_employee_v").append(" )>0");
+        shareBuilder.append(" and ( ").append(where).append(" ) ");
+        List<JSONObject> shareList = DAOUtil.executeQuery4JSON(shareBuilder.toString());
+        if (!shareList.isEmpty())
+        {
+            for (JSONObject share : shareList)
+            {
+                String queryCondition = share.getString("query_condition");
+                if (!StringUtils.isEmpty(queryCondition))
+                {
+                    if (module_share.length() > 0)
+                    {
+                        module_share.append(" or ");
+                    }
+                    module_share.append(queryCondition.replace(Constant.VAR_QUOTES, "'"));
+                }
+                else
+                {
+                    shareButNotCondition = true;
+                }
+            }
+        }
+        
+        if (!StringUtils.isEmpty(moduleId) && !StringUtils.isEmpty(dataId))
+        {
+            StringBuilder andBuilder = new StringBuilder();
             StringBuilder builder = new StringBuilder();
-            builder.append(" select * from ").append(moduleTable).append(" where id=").append(moduleId).append(" and del_status=0 ");
+            builder.append(" select t_main.* from ")
+                .append(DAOUtil.getTableName(moduleBean, companyId))
+                .append(" t_main where t_main.id=")
+                .append(dataId)
+                .append(" and t_main.del_status=0 ");
+            // 加上权限控制
+            builder.append(menuSql);
+            if (module_share.length() > 0)
+            {
+                andBuilder.append(" or ").append(module_share);
+            }
+            if (!StringUtils.isEmpty(shareIds))
+            {
+                andBuilder.append(" or ").append(Constant.MAIN_TABLE_ALIAS).append(".id in (").append(shareIds).append(" ) ");
+            }
+            // 如果可以存在任何条件共享的，就不需要加权限限制了
+            if (shareButNotCondition)
+            {
+                builder.append(" and 1=1 ");
+            }
+            else
+            {
+                if (andBuilder.length() > 0)
+                {
+                    builder.append(" and (1=1 ");
+                    builder.append(andBuilder);
+                    builder.append(" ) ");
+                }
+                
+            }
             JSONObject object = DAOUtil.executeQuery4FirstJSON(builder.toString());
             if (object == null)
             {
@@ -2069,8 +2258,34 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
         if (!StringUtils.isEmpty(dataId))
         {
             String tableName = DAOUtil.getTableName(moduleBean, companyId);
+            StringBuilder andBuilder = new StringBuilder();
             StringBuilder sb = new StringBuilder();
-            sb.append(" select del_status, seas_pool_id from ").append(tableName).append(" where id=").append(dataId);
+            sb.append(" select t_main.del_status, t_main.seas_pool_id from ").append(tableName).append(" t_main where t_main.id=").append(dataId);
+            // 加上权限控制
+            sb.append(menuSql);
+            if (module_share.length() > 0)
+            {
+                andBuilder.append(" or ").append(module_share);
+            }
+            if (!StringUtils.isEmpty(shareIds))
+            {
+                andBuilder.append(" or ").append(Constant.MAIN_TABLE_ALIAS).append(".id in (").append(shareIds).append(" ) ");
+            }
+            // 如果可以存在任何条件共享的，就不需要加权限限制了
+            if (shareButNotCondition)
+            {
+                sb.append(" and 1=1 ");
+            }
+            else
+            {
+                if (andBuilder.length() > 0)
+                {
+                    sb.append(" and (1=1 ");
+                    sb.append(andBuilder);
+                    sb.append(" ) ");
+                }
+                
+            }
             JSONObject jsonData = DAOUtil.executeQuery4FirstJSON(sb.toString());
             if (jsonData == null)
             {
@@ -2092,8 +2307,6 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
                 }
                 else
                 {
-                    // 员工所属角色
-                    Integer roleId = roleJson.getInteger("id");
                     // 如果是管理者获取企业所有者 需要返回有权限
                     if (roleId.intValue() == 1 || roleId.intValue() == 2)
                     {
@@ -2117,8 +2330,6 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
         }
         else
         {
-            // 员工所属角色
-            Integer roleId = roleJson.getInteger("id");
             // 如果是管理者获取企业所有者 需要返回有权限
             if (roleId.intValue() == 1 || roleId.intValue() == 2)
             {
@@ -2190,28 +2401,38 @@ public class ModuleDataAuthAppServiceImpl implements ModuleDataAuthAppService
     }
     
     @Override
-    public JSONObject getReadAuthFromModule(Map<String, String> reqMap)
+    public JSONObject getAuthByModule(String moduleBean, String token, String clientFlag)
     {
         
         JSONObject result = new JSONObject();
-        String dataId = reqMap.get("dataId");
-        String bean = reqMap.get("bean");
-        String token = reqMap.get("token");
         // 解析token
         InfoVo info = TokenMgr.obtainInfo(token);
         // 公司id
         Long companyId = info.getCompanyId();
-        Long employeeId = info.getEmployeeId();
-        StringBuilder query = new StringBuilder();
-        query.append(" select count(1) as readAuth from ")
-            .append(DAOUtil.getTableName(bean, companyId))
-            .append(" where (")
-            .append(employeeId)
-            .append(" in (share_ids) or create_by=")
-            .append(employeeId)
-            .append(") and del_status=0 and id=")
-            .append(dataId);
-        result = DAOUtil.executeQuery4FirstJSON(query.toString());
+        String roleModuleTable = DAOUtil.getTableName("role_module", companyId);
+        String moduleTable = DAOUtil.getTableName("application_module", companyId);
+        JSONObject roleJson = getRoleByUser(token);
+        // 角色id.
+        Integer roleId = roleJson.getInteger("id");
+        StringBuilder querySql = new StringBuilder();
+        querySql.append("select count(1) from ");
+        querySql.append(roleModuleTable);
+        querySql.append(" t1, ");
+        querySql.append(moduleTable);
+        querySql.append(" t2 where t1.module_id = t2.id and t1.role_id = ");
+        querySql.append(roleId);
+        querySql.append(" and t2.").append(Constant.FIELD_DEL_STATUS).append("=0 ");
+        querySql.append(" and t1.module_id=(select id from ").append(moduleTable).append(" where english_name='").append(moduleBean).append("')");
+        // 0：pc、手机都不显示 1:手机 2：pc 3：都显示
+        if ("0".equals(clientFlag))
+        {
+            querySql.append(" and ( t2.terminal_app=2 or t2.terminal_app=3 ) ");
+        }
+        else
+        {
+            querySql.append(" and ( t2.terminal_app=1 or t2.terminal_app=3 ) ");
+        }
+        result.put("readAuth", DAOUtil.executeCount(querySql.toString()));
         return result;
         
     }

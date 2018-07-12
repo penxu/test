@@ -86,7 +86,7 @@ public class ImConstant
     
     public static final int PUSH_SETTING_DINGDING_TUNNEL = 5;
     
-    // 触发推送的事件( 1.消息推送；2.短信提醒；3.邮件提醒；4.微信提醒；5.钉钉提醒)
+    // 触发推送的事件( 1.新增；2.共享；3.转移；4.移动；5.删除；6.编辑；7.评论；8.提醒)
     public static final int PUSH_SETTING_TRIGGER_ADD = 1;
     
     public static final int PUSH_SETTING_TRIGGER_SHARE = 2;

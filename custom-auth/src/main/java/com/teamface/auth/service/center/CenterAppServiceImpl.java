@@ -10,7 +10,6 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.alibaba.fastjson.JSONObject;
 import com.teamface.async.UserAsyncHandle;
@@ -23,7 +22,6 @@ import com.teamface.common.util.QuartzManager;
 import com.teamface.common.util.RandomUtil;
 import com.teamface.common.util.dao.BusinessDAOUtil;
 import com.teamface.common.util.dao.DAOUtil;
-import com.teamface.common.util.dao.JedisClusterHelper;
 import com.teamface.common.util.dao.RedisUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
@@ -196,7 +194,7 @@ public class CenterAppServiceImpl implements CenterAppService
             String inviteCode = RandomUtil.queryRandomNum(8);
             List<Object> model = new ArrayList<>();
             model.add(inviteCode);
-            model.add(map.get("activity").toString());
+            model.add(map.get("activity"));
             model.add(Constant.CURRENCY_ONE);
             model.add(Long.parseLong(map.get("endTime")));
             batchValues.add(model);
@@ -244,13 +242,25 @@ public class CenterAppServiceImpl implements CenterAppService
                     .append(map.get("endTime"))
                     .append("','")
                     .append(map.get("version"))
-                    .append("','")
-                    .append(map.get("industry"))
-                    .append("','")
-                    .append(map.get("address"))
-                    .append("',")
-                    .append(map.get("userId"))
-                    .append(")");
+                    .append("',");
+            if (map.get("industry") == null || map.get("industry").toString().isEmpty() || "[]".equals(map.get("industry")))
+            {
+                insertBuilder.append("null");
+            }
+            else
+            {
+                insertBuilder.append("'").append(map.get("industry").toString().replace("'", "''")).append("'");
+            }
+            insertBuilder.append(",");
+            if (map.get("address") == null || map.get("address").toString().isEmpty() || "[]".equals(map.get("address")))
+            {
+                insertBuilder.append("null");
+            }
+            else
+            {
+                insertBuilder.append("'").append(map.get("address").toString().replace("'", "''")).append("'");
+            }
+            insertBuilder.append(",").append(map.get("userId")).append(")");
             int count = DAOUtil.executeUpdate(insertBuilder.toString());
             if (count <= 0)
             {
@@ -514,8 +524,9 @@ public class CenterAppServiceImpl implements CenterAppService
                     .append(map.get("keyWord"))
                     .append("%' or user_name like  '%")
                     .append(map.get("keyWord"))
-                    .append("%'");
+                    .append("%')");
             }
+            buf.append(" order by id desc ");
             int pageSize = Integer.parseInt(map.get("pageSize"));
             int pageNum = Integer.parseInt(map.get("pageNum"));
             result = BusinessDAOUtil.getTableDataListAndPageInfo(buf.toString(), pageSize, pageNum);
@@ -534,11 +545,12 @@ public class CenterAppServiceImpl implements CenterAppService
     public JSONObject queryFormalUserList(Map<String, String> map)
     {
         JSONObject result = new JSONObject();
+        
         try
         {
             String formalTable = DAOUtil.getTableName("formal_user", "");
             StringBuilder buf = new StringBuilder();
-            buf.append("select f.* from ").append(formalTable).append(" f  where f.del_status=").append(
+            buf.append("select f.*,a.user_name customer_name from ").append(formalTable).append(" f  join center_account  a  on f.customer_id= a.id  where f.del_status=").append(
                 Constant.CURRENCY_ZERO);
             if (!"".equals(map.get("keyWord")) && null != map.get("keyWord"))
             {
@@ -548,8 +560,9 @@ public class CenterAppServiceImpl implements CenterAppService
                     .append(map.get("keyWord"))
                     .append("%' or f.user_name like  '%")
                     .append(map.get("keyWord"))
-                    .append("%'");
+                    .append("%')");
             }
+            buf.append(" order by f.start_time desc ");
             int pageSize = Integer.parseInt(map.get("pageSize"));
             int pageNum = Integer.parseInt(map.get("pageNum"));
             result = BusinessDAOUtil.getTableDataListAndPageInfo(buf.toString(), pageSize, pageNum);
@@ -577,11 +590,11 @@ public class CenterAppServiceImpl implements CenterAppService
                 serviceResult.setCodeMsg(resultCode.get("postprocess.user.auth.error"), resultCode.getMsgZh("postprocess.user.auth.error"));
                 return serviceResult;
             }
-            StringBuilder builder = new StringBuilder("select count(*) from formal_user where account='").append(map.get("phone").toString().trim()).append("'");
+            StringBuilder builder = new StringBuilder("select count(*) from formal_user where phone='").append(map.get("phone").toString().trim()).append("'").append(" and del_status = ").append(Constant.CURRENCY_ZERO);
             int sum = DAOUtil.executeCount(builder.toString()); // 手机号是否存在
             if (sum > 0)
             {
-                serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.existence"), resultCode.getMsgZh("postprocess.register.user.existence"));
+                serviceResult.setCodeMsg(resultCode.get("common.register.user.existence"), resultCode.getMsgZh("common.register.user.existence"));
                 return serviceResult;
             }
             if (null != map.get("inviteCode") && !"".equals(map.get("inviteCode")))
@@ -589,7 +602,7 @@ public class CenterAppServiceImpl implements CenterAppService
                 serviceResult = commValidate(map); // 验证邀请码
                 if (!serviceResult.isSucces())
                 {
-                    serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                    serviceResult.setCodeMsg(serviceResult.getCode(), serviceResult.getObj());
                     return serviceResult;
                 }
                 StringBuilder editBuilder = new StringBuilder("update invite set quantity = quantity - ").append(Constant.CURRENCY_ONE)
@@ -617,15 +630,25 @@ public class CenterAppServiceImpl implements CenterAppService
                     .append(map.get("endTime"))
                     .append("','")
                     .append(map.get("edition"))
-                    .append("','")
-                    .append(map.get("industry"))
-                    .append("','")
-                    .append(map.get("address"))
-                    .append("',")
-                    .append(map.get("userId"))
-                    .append(",'")
-                    .append(map.get("phone"))
-                    .append("')");
+                    .append("',");
+            if (map.get("industry") == null || map.get("industry").toString().isEmpty() || "[]".equals(map.get("industry")))
+            {
+                insertBuilder.append("null");
+            }
+            else
+            {
+                insertBuilder.append("'").append(map.get("industry").toString().replace("'", "''")).append("'");
+            }
+            insertBuilder.append(",");
+            if (map.get("address") == null || map.get("address").toString().isEmpty() || "[]".equals(map.get("address")))
+            {
+                insertBuilder.append("null");
+            }
+            else
+            {
+                insertBuilder.append("'").append(map.get("address").toString().replace("'", "''")).append("'");
+            }
+            insertBuilder.append(",").append(map.get("userId")).append(",'").append(map.get("phone")).append("')");
             int count = DAOUtil.executeUpdate(insertBuilder.toString());// 试用客户
             if (count <= 0)
             {
@@ -678,15 +701,18 @@ public class CenterAppServiceImpl implements CenterAppService
             serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.invite.error"), resultCode.getMsgZh("postprocess.register.user.invite.error"));
             return serviceResult;
         }
-        if (object.getInteger("quantity") - 1 < 0)
+        if (object.getInteger("invite_type") == Constant.CURRENCY_ZERO)
         {
-            serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.invite.error"), resultCode.getMsgZh("postprocess.register.user.invite.error"));
-            return serviceResult;
-        }
-        if (System.currentTimeMillis() > object.getLong("end_time"))
-        {
-            serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.invite.error"), resultCode.getMsgZh("postprocess.register.user.invite.error"));
-            return serviceResult;
+            if (object.getInteger("quantity") - 1 < 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.invite.error"), resultCode.getMsgZh("postprocess.register.user.invite.error"));
+                return serviceResult;
+            }
+            if (System.currentTimeMillis() > object.getLong("end_time"))
+            {
+                serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.invite.error"), resultCode.getMsgZh("postprocess.register.user.invite.error"));
+                return serviceResult;
+            }
         }
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         return serviceResult;
@@ -893,12 +919,25 @@ public class CenterAppServiceImpl implements CenterAppService
                 .append(map.get("endTime"))
                 .append("',edition='")
                 .append(map.get("edition"))
-                .append("',industry='")
-                .append(map.get("industry"))
-                .append("',address='")
-                .append(map.get("address"))
-                .append("' where id = ")
-                .append(map.get("id"));
+                .append("',industry=");
+            if (map.get("industry") == null || map.get("industry").toString().isEmpty() || "[]".equals(map.get("industry")))
+            {
+                builder.append("null");
+            }
+            else
+            {
+                builder.append("'").append(map.get("industry").toString().replace("'", "''")).append("'");
+            }
+            builder.append(",address=");
+            if (map.get("address") == null || map.get("address").toString().isEmpty() || "[]".equals(map.get("address")))
+            {
+                builder.append("null");
+            }
+            else
+            {
+                builder.append("'").append(map.get("address").toString().replace("'", "''")).append("'");
+            }
+            builder.append(" where id = ").append(map.get("id"));
             int count = DAOUtil.executeUpdate(builder.toString());
             if (count <= 0)
             {

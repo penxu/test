@@ -30,7 +30,8 @@ import com.teamface.common.util.dao.RedisUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
 import com.teamface.common.util.sendMessageUtil.SendMessage;
-import com.teamface.custom.async.CustomAsyncHandle;
+import com.teamface.custom.async.AsyncHandle;
+import com.teamface.custom.async.thread.custom.ModifyUserInfo;
 import com.teamface.custom.service.im.ImChatService;
 import com.teamface.custom.service.im.ImCircleAppService;
 import com.teamface.custom.service.library.FileLibraryAppService;
@@ -241,6 +242,17 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
                 return serviceResult;
             }
             String departmentName = DAOUtil.getTableName("department_center", companyId);
+            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder.append(" select * from ");
+            queryBuilder.append(departmentName);
+            queryBuilder.append(" where employee_id =");
+            queryBuilder.append(map.get("id"));
+            queryBuilder.append(" and  leader = ");
+            queryBuilder.append(Constant.CURRENCY_ONE);
+            queryBuilder.append(" and  status = ");
+            queryBuilder.append(Constant.CURRENCY_ZERO);
+            List<JSONObject> jsonList = DAOUtil.executeQuery4JSON(queryBuilder.toString());
+            
             StringBuilder buf = new StringBuilder("delete  from ").append(departmentName).append(" where employee_id =").append(map.get("id")).append(" and status = 0 ");
             int sum = DAOUtil.executeUpdate(buf.toString()); // 修改员工部门中间表
             if (sum <= 0)
@@ -266,10 +278,30 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
                     {
                         model.add(Constant.CURRENCY_ZERO);
                     }
+                    boolean flag = false;
+                    if (!jsonList.isEmpty())
+                    { // 判断是否有之前存在部门存在 和负责人
+                        for (int i = 0; i < jsonList.size(); i++)
+                        {
+                            JSONObject jsonObject = jsonList.get(i);
+                            if (jsonObject.getLong("department_id").equals(Long.parseLong(deparId)))
+                            {
+                                flag = true;
+                            }
+                        }
+                    }
+                    if (flag)
+                    {
+                        model.add(Constant.CURRENCY_ONE);
+                    }
+                    else
+                    {
+                        model.add(Constant.CURRENCY_ZERO);
+                    }
                     batchValues.add(model);
                     
                 }
-                StringBuilder builder = new StringBuilder("insert into ").append(departmentName).append("(department_id,employee_id,is_main) values(?,?,?)");
+                StringBuilder builder = new StringBuilder("insert into ").append(departmentName).append("(department_id,employee_id,is_main,leader) values(?,?,?,?)");
                 int count = DAOUtil.executeUpdate(builder.toString(), batchValues, 100000);
                 if (count <= 0)
                 {
@@ -282,8 +314,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", companyId);
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (NumberFormatException e)
         {
@@ -410,8 +444,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
         JSONObject reqJSON = new JSONObject();
         reqJSON.put("companyId", info.getCompanyId());
         reqJSON.put("employeeId", info.getEmployeeId());
-        CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-        customHandle.modifyUserInfo();
+        AsyncHandle asyncHandle = new AsyncHandle();
+        ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+        mu.setName("ModifyUserInfo-Thread");
+        asyncHandle.commitJob(mu);
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         return serviceResult;
     }
@@ -442,8 +478,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (Exception e)
         {
@@ -501,8 +539,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (Exception e)
         {
@@ -567,8 +607,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (NumberFormatException e)
         {
@@ -652,7 +694,7 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
     @Override
     public JSONObject savaDepartment(Map<String, Object> map)
     {
-        JSONObject  jsonObject = new JSONObject();
+        JSONObject jsonObject = new JSONObject();
         try
         {
             String token = map.get("token").toString();
@@ -779,8 +821,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (NumberFormatException e)
         {
@@ -852,8 +896,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (NumberFormatException e)
         {
@@ -1210,8 +1256,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("companyId", info.getCompanyId());
             reqJSON.put("employeeId", info.getEmployeeId());
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(null, reqJSON);
-            customHandle.modifyUserInfo();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyUserInfo mu = new ModifyUserInfo(reqJSON);
+            mu.setName("ModifyUserInfo-Thread");
+            asyncHandle.commitJob(mu);
         }
         catch (Exception e)
         {
@@ -1787,8 +1835,10 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
                 else
                 {
                     builder.append(jsonObject.getLong("id").toString());
-                }               
-            }else {
+                }
+            }
+            else
+            {
                 StringBuilder companyBuilder = new StringBuilder();
                 companyBuilder.append(" select array_to_string(array_agg(distinct(id)),',')  from ");
                 companyBuilder.append(departmentTable).append(" where  status = ").append(Constant.CURRENCY_ZERO);
@@ -1887,6 +1937,58 @@ public class EmployeeAppServiceImpl implements EmployeeAppService
             return new ArrayList<>();
         }
         return list;
+    }
+    
+    /**
+     * 项目人员卡片信息
+     */
+    @Override
+    public JSONObject queryProjectEmployee(String employeeId, String token)
+    {
+        InfoVo info = TokenMgr.obtainInfo(token);
+        Long companyId = info.getCompanyId();
+        String employeeTable = DAOUtil.getTableName("employee", companyId);
+        String roleTable = DAOUtil.getTableName("role", companyId);
+        String postTable = DAOUtil.getTableName("post", companyId);
+        String centerTable = DAOUtil.getTableName("department_center", companyId);
+        String departmentTable = DAOUtil.getTableName("department", companyId);
+        StringBuilder queryBilder = new StringBuilder();
+        JSONObject jsonObject = new JSONObject();
+        try
+        {
+            queryBilder.append("select e.*, p.name post_name, r.name role_name,d.department_name,c.department_id  from ");
+            queryBilder.append(employeeTable);
+            queryBilder.append(" e left join ");
+            queryBilder.append(postTable);
+            queryBilder.append(" p on e.post_id = p.id left join ");
+            queryBilder.append(roleTable);
+            queryBilder.append(" r on e.role_id = r.id  left join ");
+            queryBilder.append(centerTable);
+            queryBilder.append(" c on e.id = c.employee_id  left join ");
+            queryBilder.append(departmentTable);
+            queryBilder.append(" d on c.department_id = d.id   where e.id=");
+            queryBilder.append(employeeId);
+            queryBilder.append(" and   c.is_main = ");
+            queryBilder.append(Constant.CURRENCY_ONE);
+            queryBilder.append(" and   c.status = ");
+            queryBilder.append(Constant.CURRENCY_ZERO);
+            jsonObject = DAOUtil.executeQuery4FirstJSON(queryBilder.toString());
+            queryBilder.setLength(0);
+            queryBilder.append(" SELECT e.employee_name  from  ");
+            queryBilder.append(centerTable);
+            queryBilder.append("  d LEFT JOIN    ");
+            queryBilder.append(employeeTable);
+            queryBilder.append("  e on d.employee_id = e.id   where  d.department_id  =   ");
+            queryBilder.append(jsonObject.getLong("department_id"));
+            queryBilder.append("    and d.is_main = 1 and d.leader  = 1");
+            Object object = DAOUtil.executeQuery4Object(queryBilder.toString());
+            jsonObject.put("main_employee_name", object);
+        }
+        catch (Exception e)
+        {
+            log.error(e.getMessage(), e);
+        }
+        return jsonObject;
     }
     
 }

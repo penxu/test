@@ -33,7 +33,10 @@ import com.teamface.common.util.dao.MongoDBUtil;
 import com.teamface.common.util.dao.UtilDTO.Field;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
-import com.teamface.custom.async.CustomAsyncHandle;
+import com.teamface.custom.async.AsyncHandle;
+import com.teamface.custom.async.thread.custom.ModifyFieldDependance;
+import com.teamface.custom.async.thread.custom.ModifySubmenuByLayout;
+import com.teamface.custom.async.thread.custom.SaveCustomModuleLayout;
 import com.teamface.custom.service.auth.ModuleDataAuthAppService;
 import com.teamface.custom.service.auth.ModulePageAuthAppService;
 import com.teamface.custom.service.employee.EmployeeAppService;
@@ -162,8 +165,10 @@ public class LayoutAppServiceImpl implements LayoutAppService
                 reqJSON4.put("enableLayoutJson", enableLayoutJson);
                 reqJSON4.put("beanName", beanName);
                 reqJSON4.put("companyId", companyId);
-                CustomAsyncHandle customHandle4 = new CustomAsyncHandle(token, reqJSON4);
-                customHandle4.modifyFieldDependance();
+                AsyncHandle asyncHandle = new AsyncHandle();
+                ModifyFieldDependance mfd = new ModifyFieldDependance(reqJSON4);
+                mfd.setName("ModifyFieldDependance-Thread");
+                asyncHandle.commitJob(mfd);
                 
                 JSONObject moduleJson = moduleAppService.findModuleByBean(token, beanName);
                 if (null != moduleJson)
@@ -172,8 +177,10 @@ public class LayoutAppServiceImpl implements LayoutAppService
                     JSONObject reqJSON3 = new JSONObject();
                     reqJSON3.put("id", moduleJson.getInteger("id"));
                     reqJSON3.put("title", enableLayoutJson.getString("title"));
-                    CustomAsyncHandle customHandle3 = new CustomAsyncHandle(token, reqJSON3);
-                    customHandle3.modifySubmenuByLayout();
+                    ModifySubmenuByLayout msbl = new ModifySubmenuByLayout(token, reqJSON3);
+                    msbl.setName("ModifySubmenuByLayout-Thread");
+                    asyncHandle.commitJob(msbl);
+                    
                     JSONObject jo = new JSONObject();
                     jo.put("module_id", moduleJson.getInteger("id"));
                     serviceResult.setCodeMsg(resultCode.get("common.sucess"), jo.toString());
@@ -208,8 +215,10 @@ public class LayoutAppServiceImpl implements LayoutAppService
             JSONObject reqJSON = new JSONObject();
             reqJSON.put("enableLayoutJson", enableLayoutJson);
             reqJSON.put("disableLayoutJson", disableLayoutJson);
-            CustomAsyncHandle customHandle = new CustomAsyncHandle(token, reqJSON);
-            customHandle.saveCustomModuleLayout();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            SaveCustomModuleLayout scml = new SaveCustomModuleLayout(token, reqJSON);
+            scml.setName("SaveCustomModuleLayout-Thread");
+            asyncHandle.commitJob(scml);
             
             // 保存PC列表字段
             enableLayoutJson.put("terminal", "0");
@@ -250,14 +259,14 @@ public class LayoutAppServiceImpl implements LayoutAppService
                 sql = JSONParser4SQL.getCreateSql(enableLayoutJson, companyId.toString());
             }
             log.warn("保存自定义布局，建表、改表语句：" + sql);
-            int result = DAOUtil.executeUpdate(sql);
+            DAOUtil.executeUpdate(sql);
             if (histLayout != null)
             {
-                log.warn("修改[" + enableLayoutJson.getString("title") + "]表单，更新了（" + result + "）张表。");
+                log.warn("修改[" + enableLayoutJson.getString("title") + "]表单，更新了表。");
             }
             else
             {
-                log.warn("创建[" + enableLayoutJson.getString("title") + "]表单，创建了（" + result + "）张表。");
+                log.warn("创建[" + enableLayoutJson.getString("title") + "]表单，创建了表。");
             }
             
             if (!StringUtil.isEmpty(processId))
@@ -681,21 +690,16 @@ public class LayoutAppServiceImpl implements LayoutAppService
         String bean = findInfo.getString("bean");
         JSONArray layoutArr = findInfo.getJSONArray("layout");
         JSONArray newLayoutArr = new JSONArray();
-        // 判断是否需要拉取字段依赖
-        JSONObject fieldJson = null;
-        if (!StringUtils.isEmpty(plistRelyon) || !clientFlag.equals("0"))
-        {
-            // 查询条件
-            Document queryDoc = new Document();
-            queryDoc.put("companyId", findInfo.getString("companyId"));
-            queryDoc.put("bean", bean);
-            fieldJson = LayoutUtil.findDoc(queryDoc, Constant.PICKUPLIST_RELYON_COLLECTION);
-        }
         
-        Document filter = new Document();
-        filter.put("companyId", findInfo.getString("companyId"));
-        filter.put("bean", bean);
-        JSONObject controlJson = LayoutUtil.findDoc(filter, Constant.PICKUPLIST_CONTROL_COLLECTION);
+        // 查询条件
+        Document queryDoc = new Document();
+        queryDoc.put("companyId", findInfo.getString("companyId"));
+        queryDoc.put("bean", bean);
+        // 拉取字段依赖
+        List<JSONObject> fieldsJson = LayoutUtil.findDocs(queryDoc, Constant.PICKUPLIST_RELYON_COLLECTION);
+        // 拉取字段控制
+        List<JSONObject> controlsJson = LayoutUtil.findDocs(queryDoc, Constant.PICKUPLIST_CONTROL_COLLECTION);
+        
         if (!layoutArr.isEmpty())
         {
             for (Object tmpLayout : layoutArr)
@@ -761,148 +765,7 @@ public class LayoutAppServiceImpl implements LayoutAppService
                         // 下拉映射、下拉控制
                         if (rowType.equals(Constant.TYPE_PICKLIST))
                         {
-                            JSONArray newEntrys = new JSONArray();
-                            if (!StringUtils.isEmpty(fieldJson))
-                            {
-                                String controlName = fieldJson.getJSONObject("controlField").getString("name");
-                                if (name.equals(controlName))
-                                {
-                                    
-                                    String controlField = fieldJson.getJSONObject("relyonField").getString("name");
-                                    JSONArray entrys = fieldJson.getJSONArray("entrys");
-                                    Iterator<Object> ite = entrys.iterator();
-                                    while (ite.hasNext())
-                                    {
-                                        JSONObject obj = (JSONObject)ite.next();
-                                        String label = obj.getString("label");
-                                        obj.put("controlField", controlField);
-                                        if (!StringUtils.isEmpty(controlJson))
-                                        {
-                                            String showFieldName = controlJson.getJSONObject("field").getString("name");
-                                            if (name.equals(showFieldName))
-                                            {
-                                                JSONArray hideEntrys = new JSONArray();
-                                                JSONArray sEntrys = controlJson.getJSONArray("entrys");
-                                                Iterator<Object> showite = sEntrys.iterator();
-                                                while (showite.hasNext())
-                                                {
-                                                    JSONObject showObj = (JSONObject)showite.next();
-                                                    String showLabel = showObj.getString("label");
-                                                    if (showLabel.equals(label))
-                                                    {
-                                                        JSONArray hidenFields = showObj.getJSONArray("hidenFields");
-                                                        Iterator<Object> hidenFieldsIte = hidenFields.iterator();
-                                                        while (hidenFieldsIte.hasNext())
-                                                        {
-                                                            JSONObject hide = (JSONObject)hidenFieldsIte.next();
-                                                            // 如果是苹果需要返回
-                                                            if (clientFlag.equals("2"))
-                                                            {
-                                                                hide.remove("label");
-                                                                hideEntrys.add(hide);
-                                                            }
-                                                            else
-                                                            {
-                                                                
-                                                                hideEntrys.add(hide.get("name"));
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                if (!hideEntrys.isEmpty())
-                                                {
-                                                    obj.put("hidenFields", hideEntrys);
-                                                }
-                                                else
-                                                {
-                                                    obj.put("hidenFields", new JSONArray());
-                                                }
-                                            }
-                                        }
-                                        JSONArray relyonList = obj.getJSONArray("relyonList");
-                                        JSONArray newRelyonList = new JSONArray();
-                                        for (Object o : relyonList)
-                                        {
-                                            JSONObject json = (JSONObject)o;
-                                            if (json.getBooleanValue("selected"))
-                                            {
-                                                json.remove("selected");
-                                                newRelyonList.add(json);
-                                            }
-                                        }
-                                        obj.put("relyonList", newRelyonList);
-                                        if (obj.containsKey("selected"))
-                                        {
-                                            obj.remove("selected");
-                                        }
-                                        newEntrys.add(obj);
-                                    }
-                                    
-                                    if (!newEntrys.isEmpty())
-                                    {
-                                        tmpRowsJson.put("entrys", newEntrys);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (!StringUtils.isEmpty(controlJson))
-                                {
-                                    JSONArray entrys = tmpRowsJson.getJSONArray("entrys");
-                                    Iterator<Object> ite = entrys.iterator();
-                                    while (ite.hasNext())
-                                    {
-                                        JSONObject obj = (JSONObject)ite.next();
-                                        String label = obj.getString("label");
-                                        String showFieldName = controlJson.getJSONObject("field").getString("name");
-                                        if (name.equals(showFieldName))
-                                        {
-                                            JSONArray hideEntrys = new JSONArray();
-                                            JSONArray sEntrys = controlJson.getJSONArray("entrys");
-                                            Iterator<Object> showite = sEntrys.iterator();
-                                            while (showite.hasNext())
-                                            {
-                                                JSONObject showObj = (JSONObject)showite.next();
-                                                String showLabel = showObj.getString("label");
-                                                if (showLabel.equals(label))
-                                                {
-                                                    JSONArray hidenFields = showObj.getJSONArray("hidenFields");
-                                                    Iterator<Object> hidenFieldsIte = hidenFields.iterator();
-                                                    while (hidenFieldsIte.hasNext())
-                                                    {
-                                                        JSONObject hide = (JSONObject)hidenFieldsIte.next();
-                                                        // 如果是苹果需要返回
-                                                        if (clientFlag.equals("2"))
-                                                        {
-                                                            hide.remove("label");
-                                                            hideEntrys.add(hide);
-                                                        }
-                                                        else
-                                                        {
-                                                            
-                                                            hideEntrys.add(hide.get("name"));
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            if (!hideEntrys.isEmpty())
-                                            {
-                                                obj.put("hidenFields", hideEntrys);
-                                            }
-                                            else
-                                            {
-                                                obj.put("hidenFields", new JSONArray());
-                                            }
-                                        }
-                                        newEntrys.add(obj);
-                                    }
-                                    
-                                    if (!newEntrys.isEmpty())
-                                    {
-                                        tmpRowsJson.put("entrys", newEntrys);
-                                    }
-                                }
-                            }
+                            tmpRowsJson = getNewRows(fieldsJson, controlsJson, tmpRowsJson, name);
                         }
                         newRowsArr.add(tmpRowsJson);
                     }
@@ -1601,14 +1464,18 @@ public class LayoutAppServiceImpl implements LayoutAppService
         JSONObject subObj = LayoutUtil.findDoc(saveDoc, Constant.SUBFORM_TABLES_COLLECTION);
         // 如果存在，则移除
         if (subObj != null)
+        {
             LayoutUtil.removeDoc(saveDoc, Constant.SUBFORM_TABLES_COLLECTION);
+        }
         
         JSONArray layoutArr = enableLayout.getJSONArray("layout");
         for (Object tmpLayout : layoutArr)
         {
             JSONObject layoutJson = (JSONObject)tmpLayout;
             if (layoutJson.getString("name").equals("systemInfo"))
+            {
                 continue;
+            }
             JSONArray rowsArr = layoutJson.getJSONArray("rows");
             for (Object tmpRows : rowsArr)
             {
@@ -1874,10 +1741,17 @@ public class LayoutAppServiceImpl implements LayoutAppService
                 {
                     JSONObject rowsJson = (JSONObject)object2;
                     String rowName = rowsJson.getString("name");
-                    // 系统分栏，不处理
+                    String rowType = rowsJson.getString("type");
                     if (layoutJson.getString("name").equals("systemInfo"))
                     {
                         rowsJson.getJSONObject("field").put("fieldControl", "1");
+                        newRowsArr.add(rowsJson);
+                        continue;
+                    }
+                    if ((rowType.equals(Constant.TYPE_IDENTIFIER) || rowType.equals(Constant.TYPE_FORMULA) || rowType.equals(Constant.TYPE_SUBFORM_FORMULA)
+                        || rowType.equals(Constant.TYPE_SENIORFORMULA) || rowType.equals(Constant.TYPE_FUNCTIONFORMULA))
+                        && (operationType == 2 || operationType == 3 || operationType == 7))
+                    {
                         newRowsArr.add(rowsJson);
                         continue;
                     }
@@ -2058,14 +1932,18 @@ public class LayoutAppServiceImpl implements LayoutAppService
         JSONObject subObj = LayoutUtil.findDoc(saveDoc, Constant.SUBFORM_TABLES_COLLECTION);
         // 如果存在，则移除
         if (subObj != null)
+        {
             LayoutUtil.removeDoc(saveDoc, Constant.SUBFORM_TABLES_COLLECTION);
+        }
         
         JSONArray layoutArr = enableLayout.getJSONArray("layout");
         for (Object tmpLayout : layoutArr)
         {
             JSONObject layoutJson = (JSONObject)tmpLayout;
             if (layoutJson.getString("name").equals("systemInfo"))
+            {
                 continue;
+            }
             JSONArray rowsArr = layoutJson.getJSONArray("rows");
             for (Object tmpRows : rowsArr)
             {
@@ -2079,7 +1957,9 @@ public class LayoutAppServiceImpl implements LayoutAppService
             }
         }
         if (subformTables.isEmpty())
+        {
             return false;
+        }
         LayoutUtil.saveDoc(saveDoc, Constant.SUBFORM_TABLES_COLLECTION);
         
         String key = new StringBuilder(String.valueOf(companyId)).append("_")
@@ -2095,7 +1975,7 @@ public class LayoutAppServiceImpl implements LayoutAppService
     
     private JSONObject sortLayoutField(JSONObject layout, JSONArray order)
     {
-        if (null == order || order.size() == 0)
+        if (order.isEmpty())
         {
             return layout;
         }
@@ -2124,6 +2004,69 @@ public class LayoutAppServiceImpl implements LayoutAppService
             layoutJSON.put("rows", sortRowsArr);
         }
         return layout;
+    }
+    
+    private JSONObject getNewRows(List<JSONObject> fieldsJson, List<JSONObject> controlsJson, JSONObject tmpRowsJson, String name)
+    {
+        if (!controlsJson.isEmpty())
+        {
+            for (JSONObject cj : controlsJson)
+            {
+                JSONObject jo = (JSONObject)cj.get("field");
+                String conName = jo.getString("name");
+                if (name.equals(conName))
+                {
+                    JSONArray array = tmpRowsJson.getJSONArray("entrys");
+                    JSONArray array1 = cj.getJSONArray("entrys");
+                    for (int i = 0; i < array.size(); i++)
+                    {
+                        JSONObject json = (JSONObject)array.get(i);
+                        JSONObject json1 = (JSONObject)array1.get(i);
+                        JSONArray hideArr = json1.getJSONArray("hidenFields");
+                        json.put("hidenFields", hideArr);
+                    }
+                }
+            }
+        }
+        
+        if (!fieldsJson.isEmpty())
+        {
+            for (JSONObject fj : fieldsJson)
+            {
+                JSONObject jo = (JSONObject)fj.get("controlField");
+                String conName = jo.getString("name");
+                if (name.equals(conName))
+                {
+                    JSONArray array = tmpRowsJson.getJSONArray("entrys");
+                    JSONArray array1 = fj.getJSONArray("entrys");
+                    for (int i = 0; i < array.size(); i++)
+                    {
+                        JSONObject json = (JSONObject)array.get(i);
+                        JSONObject json1 = (JSONObject)array1.get(i);
+                        JSONArray relyonList = json1.getJSONArray("relyonList");
+                        JSONObject relyonNameJson = (JSONObject)fj.get("relyonField");
+                        JSONArray newRelyonList = new JSONArray();
+                        for (Object o : relyonList)
+                        {
+                            JSONObject json2 = (JSONObject)o;
+                            if (json2.getBooleanValue("selected"))
+                            {
+                                json2.remove("selected");
+                                newRelyonList.add(json2);
+                            }
+                        }
+                        json.put("relyonList", newRelyonList);
+                        json.put("controlField", relyonNameJson.getString("name"));
+                        if (json.containsKey("selected"))
+                        {
+                            json.remove("selected");
+                        }
+                    }
+                }
+            }
+        }
+        
+        return tmpRowsJson;
     }
     
 }

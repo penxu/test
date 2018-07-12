@@ -30,7 +30,8 @@ import com.teamface.common.util.dao.JedisClusterHelper;
 import com.teamface.common.util.dao.LayoutUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
-import com.teamface.custom.async.ReportAsyncHandle;
+import com.teamface.custom.async.AsyncHandle;
+import com.teamface.custom.async.thread.GenerateDataListFilterFields;
 import com.teamface.custom.service.auth.ModuleDataAuthAppService;
 import com.teamface.custom.service.workflow.WorkflowAppService;
 
@@ -228,19 +229,19 @@ public class ReportAppServiceImpl implements ReportAppService
                 JSONObject shareJson = (JSONObject)shareObj;
                 String shareId = shareJson.getString("id");
                 String shareType = shareJson.getString("type");// 0部门，1人员，2角色，4全公司
-                if (shareType.equals("0"))
+                if ("0".equals(shareType))
                 {
                     shareDepartmentSB.append(shareId).append(",");
                 }
-                else if (shareType.equals("1"))
+                else if ("1".equals(shareType))
                 {
                     shareUserSB.append(shareId).append(",");
                 }
-                else if (shareType.equals("2"))
+                else if ("2".equals(shareType))
                 {
                     shareRoleSB.append(shareId).append(",");
                 }
-                else if (shareType.equals("4"))
+                else if ("4".equals(shareType))
                 {
                     companyFlag = true;
                 }
@@ -250,7 +251,7 @@ public class ReportAppServiceImpl implements ReportAppService
             {
                 StringBuilder modifySql = new StringBuilder();
                 modifySql.append("update ").append(repotTable);
-                modifySql.append(" set report_label = '").append(reqJson.getString("reportLabel"));
+                modifySql.append(" set report_label = '").append(reqJson.getString("reportLabel").replace("'", "''"));
                 modifySql.append("', share_company = '").append(companyFlag ? "1" : "0");
                 modifySql.append("', report_type = '").append(reqJson.getString("reportType"));
                 modifySql.append("', share_user = '");
@@ -269,33 +270,41 @@ public class ReportAppServiceImpl implements ReportAppService
             }
             else
             {
+                List<Object> values = new ArrayList<>();
+                values.add(dataId);
+                values.add(reqJson.getString("reportName"));
+                values.add(reqJson.getString("reportLabel"));
+                values.add(reqJson.getString("dataSourceName"));
+                values.add(reqJson.getString("dataSourceLabel"));
+                values.add(reqJson.getString("reportType"));
+                values.add(companyFlag ? "1" : "0");
+                values.add(shareUserSB.length() == 0 ? "" : shareUserSB.substring(0, shareUserSB.lastIndexOf(",")));
+                values.add(shareRoleSB.length() == 0 ? "" : shareRoleSB.substring(0, shareRoleSB.lastIndexOf(",")));
+                values.add(shareDepartmentSB.length() == 0 ? "" : shareDepartmentSB.substring(0, shareDepartmentSB.lastIndexOf(",")));
+                values.add("0");
+                values.add(employeeId);
+                values.add(System.currentTimeMillis());
+                values.add(employeeId);
+                values.add(System.currentTimeMillis());
                 // 保存报表列表数据
                 StringBuilder insertSql = new StringBuilder();
                 insertSql.append("insert into ").append(repotTable);
-                insertSql.append("(id, report_name, report_label, data_source_name, data_source_label, report_type, share_company, share_user, share_role, share_department, ")
-                    .append(Constant.FIELD_DEL_STATUS)
-                    .append(", ");
+                insertSql.append("(id, report_name, report_label, data_source_name, data_source_label, report_type, share_company, share_user, share_role, share_department, ");
+                insertSql.append(Constant.FIELD_DEL_STATUS).append(", ");
                 insertSql.append("create_by, create_time, ");
-                insertSql.append("modify_by, modify_time) values('");
-                insertSql.append(dataId).append("', '");
-                insertSql.append(reqJson.getString("reportName")).append("', '");
-                insertSql.append(reqJson.getString("reportLabel")).append("', '");
-                insertSql.append(reqJson.getString("dataSourceName")).append("', '");
-                insertSql.append(reqJson.getString("dataSourceLabel")).append("', '");
-                insertSql.append(reqJson.getString("reportType")).append("', '");
-                insertSql.append(companyFlag ? "1" : "0").append("', '");
-                insertSql.append(shareUserSB.length() == 0 ? "" : shareUserSB.substring(0, shareUserSB.lastIndexOf(","))).append("', '");
-                insertSql.append(shareRoleSB.length() == 0 ? "" : shareRoleSB.substring(0, shareRoleSB.lastIndexOf(","))).append("', '");
-                insertSql.append(shareDepartmentSB.length() == 0 ? "" : shareDepartmentSB.substring(0, shareDepartmentSB.lastIndexOf(","))).append("', '0', ");
-                insertSql.append(employeeId).append(", ");
-                insertSql.append(System.currentTimeMillis()).append(",");
-                insertSql.append(employeeId).append(", ");
-                insertSql.append(System.currentTimeMillis()).append(")");
-                int intResult = DAOUtil.executeUpdate(insertSql.toString());
+                insertSql.append("modify_by, modify_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                int intResult = DAOUtil.executeUpdate(insertSql.toString(), values.toArray());
                 if (intResult < 1)
                 {
                     serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 }
+                
+                values = new ArrayList<>();
+                values.add(dataId);
+                values.add(employeeId);
+                values.add(System.currentTimeMillis());
+                // 保存点击记录
+                saveClickHist(companyId, values);
             }
         }
         catch (Exception e)
@@ -841,18 +850,12 @@ public class ReportAppServiceImpl implements ReportAppService
                     seniorWhereArr.addAll(conditionArr);
                 }
                 
+                List<Object> values = new ArrayList<>();
+                values.add(Integer.valueOf(reportId));
+                values.add(employeeId);
+                values.add(System.currentTimeMillis());
                 // 保存点击记录
-                String clickHistTable = DAOUtil.getTableName("report_click_hist", companyId);
-                StringBuilder insertSql = new StringBuilder();
-                insertSql.append("insert into ").append(clickHistTable).append("(report_id, create_by, create_time) values(");
-                insertSql.append(reportId).append(", ");
-                insertSql.append(employeeId).append(", ");
-                insertSql.append(System.currentTimeMillis()).append(")");
-                int insertClickHistResult = DAOUtil.executeUpdate(insertSql.toString());
-                if (insertClickHistResult < 1)
-                {
-                    log.warn("insert click report history operation fail!!!");
-                }
+                saveClickHist(companyId, values);
             }
             
             String chooseBean = reportLayout.getString("chooseBean");
@@ -914,7 +917,6 @@ public class ReportAppServiceImpl implements ReportAppService
     {
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
-        
         try
         {
             // 请求参数
@@ -927,6 +929,7 @@ public class ReportAppServiceImpl implements ReportAppService
             // token解析
             InfoVo info = TokenMgr.obtainInfo(token);
             Long companyId = info.getCompanyId();
+            Long employeeId = info.getEmployeeId();
             
             // 软删除数据记录
             String reportTable = DAOUtil.getTableName("report", companyId);
@@ -936,7 +939,9 @@ public class ReportAppServiceImpl implements ReportAppService
             int delResult = DAOUtil.executeUpdate(delSql.toString());
             if (delResult < 1)
             {
+                log.error("delete report operation fail!!!");
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
             }
             
             // 删除定义
@@ -945,6 +950,18 @@ public class ReportAppServiceImpl implements ReportAppService
             queryDoc.put("companyId", companyId.toString());
             queryDoc.put("styleType", styleType);
             LayoutUtil.removeDoc(queryDoc, Constant.REPORT_COLLECTION);
+            
+            // 删除最近记录
+            String clickHistTable = DAOUtil.getTableName("report_click_hist", companyId);
+            StringBuilder insertSql = new StringBuilder();
+            insertSql.append("delete from ").append(clickHistTable).append(" where report_id = ").append(reportId).append(" and create_by = ").append(employeeId);
+            int delClickHistResult = DAOUtil.executeUpdate(insertSql.toString());
+            if (delClickHistResult < 1)
+            {
+                log.error("delete click report history operation fail!!!");
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
         }
         catch (Exception e)
         {
@@ -1167,7 +1184,6 @@ public class ReportAppServiceImpl implements ReportAppService
      * @return List
      * @Description: 获取报表类型数据列表
      */
-    @SuppressWarnings("static-access")
     private JSONObject queryReportList(Map<String, String> params)
     {
         // 请求参数
@@ -1201,7 +1217,7 @@ public class ReportAppServiceImpl implements ReportAppService
         {// 最近报表（30天内点击的报表）
             Calendar calendar = Calendar.getInstance();
             calendar.setTime(new Date());
-            calendar.add(calendar.DATE, -29);
+            calendar.add(Calendar.DATE, -29);
             
             String reportClickTable = DAOUtil.getTableName("report_click_hist", companyId);
             querySql.append(" where t1.id in(select tt.report_id from ").append(reportClickTable).append(" tt");
@@ -1224,8 +1240,8 @@ public class ReportAppServiceImpl implements ReportAppService
                     querySql.append(" where ((t1.share_company = 1 or string_to_array(t1.share_user,',') @> array['").append(employeeId);
                     querySql.append("'] or ").append(employeeId);
                     querySql.append(" in(SELECT ID FROM ").append(employeeTable);
-                    querySql.append(" WHERE string_to_array(ROLE_ID,',') in(string_to_array(t1.SHARE_ROLE,',')) UNION SELECT EMPLOYEE_ID FROM ").append(departmentCenterTable);
-                    querySql.append(" WHERE string_to_array(DEPARTMENT_ID,',') in(string_to_array(t1.SHARE_DEPARTMENT,',')))) or t1.create_by=").append(employeeId).append(")");
+                    querySql.append(" WHERE array[ROLE_ID] && string_to_array(t1.SHARE_ROLE, ',')::int[] UNION SELECT EMPLOYEE_ID FROM ").append(departmentCenterTable);
+                    querySql.append(" WHERE array[DEPARTMENT_ID] && string_to_array(t1.SHARE_DEPARTMENT, ',')::int[])) or t1.create_by=").append(employeeId).append(")");
                 }
             }
         }
@@ -1235,8 +1251,8 @@ public class ReportAppServiceImpl implements ReportAppService
             querySql.append(" where (t1.share_company = 1 or string_to_array(t1.share_user,',') @> array['").append(employeeId);
             querySql.append("'] or ").append(employeeId);
             querySql.append(" in(SELECT ID FROM ").append(employeeTable);
-            querySql.append(" WHERE string_to_array(ROLE_ID,',') in(string_to_array(t1.SHARE_ROLE,',')) UNION SELECT EMPLOYEE_ID FROM ").append(departmentCenterTable);
-            querySql.append(" WHERE string_to_array(DEPARTMENT_ID,',') in(string_to_array(t1.SHARE_DEPARTMENT,','))))");
+            querySql.append(" WHERE array[ROLE_ID] && string_to_array(t1.SHARE_ROLE, ',')::int[] UNION SELECT EMPLOYEE_ID FROM ").append(departmentCenterTable);
+            querySql.append(" WHERE array[DEPARTMENT_ID] && string_to_array(t1.SHARE_DEPARTMENT, ',')::int[]))");
         }
         else if (menuId.equals("3"))
         {// 我创建的报表
@@ -1277,10 +1293,12 @@ public class ReportAppServiceImpl implements ReportAppService
         querySql.append(" limit ").append(pageSize).append(" OFFSET ").append((pageNum - 1) * pageSize);
         List<JSONObject> pageList = DAOUtil.executeQuery4JSON(querySql.toString());
         
-        if (StringUtil.isEmpty(queryType) || !queryType.equals("filter"))
+        if (StringUtil.isEmpty(queryType) || !"filter".equals(queryType))
         {
-            ReportAsyncHandle reportHandle = new ReportAsyncHandle(dataList, token);
-            reportHandle.generateDataListFilterFields();
+            AsyncHandle asyncHandle = new AsyncHandle();
+            GenerateDataListFilterFields gdlff = new GenerateDataListFilterFields(token, dataList);
+            gdlff.setName("GenerateDataListFilterFields-Thread");
+            asyncHandle.commitJob(gdlff);
         }
         
         int totalRows = dataList.size();
@@ -1388,7 +1406,7 @@ public class ReportAppServiceImpl implements ReportAppService
                 String queryField = new StringBuilder(otherTable).append(".").append(fieldName).toString();
                 String asField = new StringBuilder(otherTable).append("_").append(fieldName).toString();
                 // postgre字段名长度限制64
-                asField = asField.replace("_approval_", "_");
+                asField = asField.replace("_approval_", "_").replace("_subform_", "_");
                 asField = asField.length() > 64 ? asField.substring(0, 63) : asField;
                 
                 /***** 构造返回数据的title *****/
@@ -1403,8 +1421,10 @@ public class ReportAppServiceImpl implements ReportAppService
                         existApproval.append("(select tmp1.* from ").append(otherTable);
                         existApproval.append(" tmp1 union all select apr.* from ").append(DAOUtil.getTableName(approvalBean, companyId));
                         existApproval.append(" apr where apr.id in(select pcs.approval_data_id from ").append(DAOUtil.getTableName("process_approval", companyId));
-                        existApproval.append(" pcs where pcs.module_bean = '").append(mainModule).append("' and pcs.process_status in(0, 1) and apr.del_status = 0)) ").append(
-                            otherTable);
+                        existApproval.append(" pcs where pcs.module_bean = '")
+                            .append(mainModule)
+                            .append("' and pcs.process_status in(0, 1) and apr.del_status = 0)) ")
+                            .append(otherTable);
                         approvalBeanFlag = false;
                         querySourceModules.append(existApproval).append(", ");
                         approvalWhere.append(" order by ").append(otherTable).append(".id ");
@@ -1423,7 +1443,7 @@ public class ReportAppServiceImpl implements ReportAppService
                     if (!StringUtil.isEmpty(dataAuthMap.get(fieldBean)))
                     {
                         querySourceModuleWhere.append(" and (").append(otherTable).append(".personnel_create_by in(").append(dataAuthMap.get(fieldBean)).append("))");
-                        if (!StringUtil.isEmpty(dataShareMap.get(fieldBean)))
+                        if (null != dataShareMap && !StringUtil.isEmpty(dataShareMap.get(fieldBean)))
                         {
                             querySourceModuleWhere.append(" or ").append(otherTable).append(".id in(").append(dataShareMap.get(fieldBean)).append("))");
                         }
@@ -1523,6 +1543,14 @@ public class ReportAppServiceImpl implements ReportAppService
                         .append("_")
                         .append(fieldName)
                         .append(", ");
+                }
+                else if (fieldType.equals(Constant.TYPE_SUBFORM.concat(".").concat(Constant.TYPE_REFERENCE)))
+                {// 关联关系
+                    JSONObject refDescribe = columnFieldJson.getJSONObject("refDescribe");
+                    querySourceModuleFileds.append("(select ").append(refDescribe.getString("referenceField"));
+                    querySourceModuleFileds.append(" from ").append(refDescribe.getString("referenceBean")).append("_").append(companyId);
+                    querySourceModuleFileds.append(" where id = ").append(otherTable);
+                    querySourceModuleFileds.append(".").append(fieldName).append(") as ").append(asField).append(", ");
                 }
                 else if (fieldType.equals(Constant.TYPE_AREA))
                 {// 省市区
@@ -1740,7 +1768,7 @@ public class ReportAppServiceImpl implements ReportAppService
                 else
                 {
                     String filedName = new StringBuilder(summaryFieldJSON.getString("bean")).append("_").append(companyId).append("_").append(fieldName).toString();
-                    filedName = filedName.replace("_approval_", "_");
+                    filedName = filedName.replace("_approval_", "_").replace("_subform_", "_");
                     filedName = filedName.length() > 64 ? filedName.substring(0, 63) : filedName;
                     titleJSON.put("name", filedName);
                 }
@@ -1793,4 +1821,17 @@ public class ReportAppServiceImpl implements ReportAppService
         return dataJSON;
     }
     
+    private boolean saveClickHist(long companyId, List<Object> values)
+    {
+        String clickHistTable = DAOUtil.getTableName("report_click_hist", companyId);
+        StringBuilder insertSql = new StringBuilder();
+        insertSql.append("insert into ").append(clickHistTable).append("(report_id, create_by, create_time) values(?,?,?)");
+        int insertClickHistResult = DAOUtil.executeUpdate(insertSql.toString(), values.toArray());
+        if (insertClickHistResult < 1)
+        {
+            log.warn("insert click report history operation fail!!!");
+            return false;
+        }
+        return true;
+    }
 }

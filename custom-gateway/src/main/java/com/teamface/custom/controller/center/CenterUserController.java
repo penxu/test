@@ -260,4 +260,37 @@ public class CenterUserController
         }
         return JsonResUtil.getSuccessJsonObject(resultMap);
     }
+    
+    
+    /**
+     * 编辑账户
+     * 
+     * @param reqJsonStr
+     * @return
+     * @Description:
+     */
+    @RequestMapping(value = "/enableCenterUser", method = RequestMethod.POST)
+    public @ResponseBody JSONObject enableCenterUser(@RequestBody(required = true) String reqJsonStr, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    {
+        ServiceResult<String> serviceResult = new ServiceResult<>();
+        try
+        {
+            JSONObject layoutJson = JSONObject.parseObject(reqJsonStr);
+            if(layoutJson.getString("id").isEmpty()) {
+                return JsonResUtil.getResultJsonByIdent("common.req.param.error");
+            }
+            serviceResult = centerUserAppService.enableCenterUser(layoutJson,token);
+            if (!serviceResult.isSucces())
+            {
+                return JsonResUtil.getResultJsonObject(serviceResult.getCode(), serviceResult.getObj());
+            }
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getFailJsonObject();
+        }
+        return JsonResUtil.getSuccessJsonObject();
+        
+    }
 }

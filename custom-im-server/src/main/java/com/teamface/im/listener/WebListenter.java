@@ -8,7 +8,6 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import com.teamface.common.cache.CacheSimpleManger;
-import com.teamface.common.util.JobManager;
 import com.teamface.im.service.push.thread.MessagePushThread;
 
 public class WebListenter implements ServletContextListener
@@ -22,6 +21,7 @@ public class WebListenter implements ServletContextListener
         CacheSimpleManger.cacheLoad();
     }
     
+    @Override
     public void contextInitialized(ServletContextEvent event)
     {
         if (LOG.isDebugEnabled())
@@ -29,20 +29,17 @@ public class WebListenter implements ServletContextListener
             LOG.debug("WebListenter contextInitialized(ServletContextEvent event) start");
         }
         cacheLoad();
-        JobManager.getInstance().submitJob(new Thread(new MessagePushThread()));
+        Thread thread = new Thread(new MessagePushThread());
+        thread.setName("im-push-thread");
+        thread.start();
         if (LOG.isDebugEnabled())
         {
             LOG.debug("WebListenter contextInitialized(ServletContextEvent event) end");
         }
     }
     
-    public void contextDestroyed(ServletContextEvent event)
-    {
-    }
-    
     public static ServletContext getServletContext()
     {
         return servletContext;
     }
-    
 }

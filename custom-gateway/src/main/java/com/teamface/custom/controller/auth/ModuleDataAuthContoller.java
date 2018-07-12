@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.constant.Constant;
+import com.teamface.common.constant.DataTypes;
 import com.teamface.common.model.ServiceResult;
 import com.teamface.common.util.JsonResUtil;
 import com.teamface.custom.service.auth.ModuleDataAuthAppService;
@@ -349,5 +350,22 @@ public class ModuleDataAuthContoller
             result.put("readAuth", Constant.CURRENCY_ZERO);
         }
         return JsonResUtil.getSuccessJsonObject(result);
+    }
+    
+    /**
+     * 根据模块bean获取查看权限
+     * 
+     * @param bean
+     * @param token
+     * @param clientFlag
+     * @return
+     * @Description:
+     */
+    @RequestMapping(value = "/getAuthByModule", method = RequestMethod.GET)
+    public @ResponseBody JSONObject getModuleIdByModule(@RequestParam(value = "bean", required = true) String bean, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token,
+        @RequestHeader(DataTypes.REQUEST_HEADER_CLIENDT_FLAG) String clientFlag)
+    {
+        return JsonResUtil.getSuccessJsonObject(moduleDataAuthAppService.getAuthByModule(bean, token, clientFlag));
+        
     }
 }

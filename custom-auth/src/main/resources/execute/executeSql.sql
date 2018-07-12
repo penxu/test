@@ -1,4 +1,4 @@
-CREATE TABLE activate_record_replace (
+﻿CREATE TABLE activate_record_replace (
 id serial NOT NULL,
 employee_id int4,
 datetime_time int8,
@@ -1248,6 +1248,7 @@ status char(1) DEFAULT '0'::bpchar,
 create_by int4,
 create_time int8,
 type int4,
+pdf_url VARCHAR(2048),
 CONSTRAINT catalog_replace_pkey PRIMARY KEY (id)
 )
 ;
@@ -1486,7 +1487,9 @@ file_url varchar(4000),
 original_file_name varchar(2048),
 serial_number int2,
 upload_by varchar(512),
-upload_time BIGINT 
+upload_time BIGINT,
+bean varchar(255)，
+idx int2
 );  
 --表说明  
 COMMENT ON TABLE public.attachment_replace IS '附件表';  
@@ -1501,7 +1504,38 @@ COMMENT ON COLUMN public.attachment_replace.original_file_name IS '服务器文�
 COMMENT ON COLUMN public.attachment_replace.serial_number IS '序列号';  
 COMMENT ON COLUMN public.attachment_replace.upload_by IS '附件上传者';  
 COMMENT ON COLUMN public.attachment_replace.upload_time IS '附件上传时间';
+COMMENT ON COLUMN public.attachment_replace.bean IS '所属对象';
+COMMENT ON COLUMN public.attachment_replace.idx IS '所属行';
 
+CREATE TABLE public.attachment_approval_replace(  
+id SERIAL PRIMARY KEY NOT NULL, 
+data_id BIGINT,
+file_name varchar(2048),  
+file_type varchar(1024),  
+file_size BIGINT,  
+file_url varchar(4000),  
+original_file_name varchar(2048),
+serial_number int2,
+upload_by varchar(512),
+upload_time BIGINT,
+bean varchar(255)，
+idx int2
+);  
+--表说明  
+COMMENT ON TABLE public.public.attachment_approval_replace IS '附件表';  
+--字段说明  
+COMMENT ON COLUMN public.public.attachment_approval_replace.id IS '主键ID';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.data_id IS '数据id';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.file_name IS '附件名称';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.file_type IS '附件类型';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.file_size IS '附件大小';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.file_url IS '附件URL';    
+COMMENT ON COLUMN public.public.attachment_approval_replace.original_file_name IS '服务器文件名称';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.serial_number IS '序列号';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.upload_by IS '附件上传者';  
+COMMENT ON COLUMN public.public.attachment_approval_replace.upload_time IS '附件上传时间';
+COMMENT ON COLUMN public.public.attachment_approval_replace.bean IS '所属对象';
+COMMENT ON COLUMN public.public.attachment_approval_replace.idx IS '所属行';
 
 CREATE TABLE module_seapool_setting_replace (
 id serial NOT NULL,
@@ -1853,6 +1887,7 @@ CREATE TABLE open_file_email_replace(
 id serial NOT NULL,
 file_id int4,
 email varchar(1000),
+create_by int4,
 create_time int8,
 CONSTRAINT open_file_email_replace_pkey PRIMARY KEY (id)
 );
@@ -1862,6 +1897,8 @@ COMMENT ON TABLE "public"."open_file_email_replace" IS '文件库公开链接邮
 COMMENT ON COLUMN "public"."open_file_email_replace"."file_id" IS '公开ID';
 
 COMMENT ON COLUMN "public"."open_file_email_replace"."email" IS '邮件';
+
+COMMENT ON COLUMN "public"."open_file_email_replace"."create_by" IS '发送人';
 
 COMMENT ON COLUMN "public"."open_file_email_replace"."create_time" IS '发送时间';
 
@@ -2539,6 +2576,7 @@ module_id int4,
 bean varchar(50),
 field_name varchar(50),
 auto_number int4,
+date_format varchar(50),
 CONSTRAINT auto_sequence_number_replace_pkey PRIMARY KEY (id)
 );
 COMMENT ON TABLE auto_sequence_number_replace IS '自动增长序列号表(自定义设置自动编号用)';
@@ -2546,3 +2584,32 @@ COMMENT ON COLUMN auto_sequence_number_replace.module_id IS '模块id';
 COMMENT ON COLUMN auto_sequence_number_replace.bean IS '模块名称';
 COMMENT ON COLUMN auto_sequence_number_replace.field_name IS '字段名称';
 COMMENT ON COLUMN auto_sequence_number_replace.auto_number IS '自动增长序列号';
+COMMENT ON COLUMN auto_sequence_number_replace.date_format IS '日期格式';
+
+CREATE TABLE "public"."personel_task_replace" (
+"id" serial NOT NULL,
+"choosebean" varchar(255),
+"data_id" int4,
+"employee_id" int4,
+"participants_only" char(1) DEFAULT '0'::bpchar,
+"personnel_create_by" varchar(100),
+"datetime_create_time" int8,
+"personnel_modify_by" varchar(100),
+"datetime_modify_time" int8,
+"del_status" char(1) DEFAULT '0'::bpchar,
+"task_status" char(1) DEFAULT '0'::bpchar,
+CONSTRAINT "personel_task_replace_pkey" PRIMARY KEY ("id")
+);
+
+COMMENT ON TABLE "public"."personel_task_replace" IS '个人任务关联表';
+COMMENT ON COLUMN "public"."personel_task_replace"."id" IS '主键id';
+COMMENT ON COLUMN "public"."personel_task_replace"."choosebean" IS '关联的模块';
+COMMENT ON COLUMN "public"."personel_task_replace"."data_id" IS '模块数据ID';
+COMMENT ON COLUMN "public"."personel_task_replace"."employee_id" IS '当前登陆人';
+COMMENT ON COLUMN "public"."personel_task_replace"."participants_only" IS '仅参与人可见';
+COMMENT ON COLUMN "public"."personel_task_replace"."personnel_create_by" IS '创建人';
+COMMENT ON COLUMN "public"."personel_task_replace"."datetime_create_time" IS '创建时间';
+COMMENT ON COLUMN "public"."personel_task_replace"."personnel_modify_by" IS '修改人';
+COMMENT ON COLUMN "public"."personel_task_replace"."datetime_modify_time" IS '修改时间';
+COMMENT ON COLUMN "public"."personel_task_replace"."del_status" IS '删除状态';
+COMMENT ON COLUMN "public"."personel_task_replace"."task_status" IS '完成状态  0:未完成 1:完成 ';

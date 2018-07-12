@@ -19,5 +19,5 @@
 	<dubbo:reference id="projectWorkbenchService" interface="com.teamface.custom.service.project.ProjectWorkbenchService" />
     <dubbo:reference id="projectAutomationService" interface="com.teamface.custom.service.project.ProjectAutomationAppService" />
     <dubbo:reference id="projectTaskService" interface="com.teamface.custom.service.project.ProjectTaskService" />
-    
+    <dubbo:reference id="personelTaskService" interface="com.teamface.custom.service.project.PersonelTaskService" />
 </beans>

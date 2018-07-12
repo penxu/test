@@ -237,14 +237,6 @@ public interface ProjectTaskService
     
     /**
      * 
-     * @param map
-     * @return
-     * @Description:获取任务业务数据列表
-     */
-    public JSONObject queryTaskListByCondition(Map<String, String> reqParam);
-    
-    /**
-     * 
      * @param reqParam
      * @return
      * @Description:获取项目任务业务数据列表

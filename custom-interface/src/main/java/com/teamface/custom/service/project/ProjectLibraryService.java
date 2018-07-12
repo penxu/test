@@ -82,7 +82,7 @@ public interface ProjectLibraryService
      * @return
      * @Description:
      */
-    public boolean shiftProjectLibrary(InfoVo info, JSONObject jsonObject);
+    public boolean shiftProjectLibrary(String token, JSONObject jsonObject);
     
     /**
      * 内部复制文件
@@ -124,14 +124,14 @@ public interface ProjectLibraryService
     public List<JSONObject> queryFileLibraryList(Map<String, String> map);
     
     /**
-     * 模块数据ID
+     * 项目数据文件
      * 
      * @param token
      * @param jsonObject
      * @return
      * @Description:
      */
-    public boolean editModuleDataId(String token, List<JSONObject> jsonObject);
+    public boolean insertProjectDataId(String token, List<JSONObject> jsonObject,Long parent_id);
     
     /**
      * 查询项目列表

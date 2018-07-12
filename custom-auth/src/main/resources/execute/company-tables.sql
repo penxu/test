@@ -18,7 +18,7 @@ relation_id int4,
 datetime_time int8,
 content varchar,
 employee_id int4,
-information varchar(2018),
+information text,
 sign_id int4,
 CONSTRAINT comment_replace_pkey PRIMARY KEY (id)
 );
@@ -381,6 +381,7 @@ status char(1) DEFAULT '0'::bpchar,
 create_by int4,
 create_time int8,
 type int4,
+pdf_url VARCHAR(2014),
 CONSTRAINT catalog_replace_pkey PRIMARY KEY (id)
 );
 CREATE TABLE download_record_replace (
@@ -465,7 +466,23 @@ file_url varchar(4000),
 original_file_name varchar(2048),
 serial_number int2,
 upload_by varchar(512),
-upload_time BIGINT 
+upload_time BIGINT,
+bean varchar(255),
+idx int2
+);
+CREATE TABLE public.attachment_approval_replace(  
+id SERIAL PRIMARY KEY NOT NULL, 
+data_id BIGINT,
+file_name varchar(2048),  
+file_type varchar(1024),  
+file_size BIGINT,  
+file_url varchar(4000),  
+original_file_name varchar(2048),
+serial_number int2,
+upload_by varchar(512),
+upload_time BIGINT,
+bean varchar(2048),
+idx int2
 );
 CREATE TABLE module_seapool_setting_replace (
 id serial NOT NULL,
@@ -1500,6 +1517,33 @@ del_status char(1) default 0,
 CONSTRAINT project_management_priviledge_replace_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE project_management_workflow_replace(
+id serial NOT NULL,
+name  varchar(50),                                               
+describe varchar(500),
+members text,
+node_data_array text,
+link_data_array text,
+del_status char(1) default 0,
+create_by int4,                                       
+create_time int8,
+update_by int4,                                       
+update_time int8,                                      
+CONSTRAINT project_management_priviledge_workflow_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.project_attachment_replace(  
+id SERIAL PRIMARY KEY NOT NULL, 
+data_id BIGINT,
+file_name varchar(2048),  
+file_type varchar(1024),  
+file_size BIGINT,  
+file_url varchar(4000),  
+original_file_name varchar(2048),
+serial_number int2,
+upload_by varchar(512),
+upload_time BIGINT,
+bean varchar(2048)
+);
 
 CREATE TABLE project_library_replace (
 id serial NOT NULL,
@@ -1525,6 +1569,7 @@ module_id int4,
 bean varchar(50),
 field_name varchar(50),
 auto_number int4,
+date_format varchar(50),
 CONSTRAINT auto_sequence_number_replace_pkey PRIMARY KEY (id)
 );
 
@@ -1535,4 +1580,19 @@ cache_key varchar(8000),
 cache_value varchar(8000),
 create_time int8,
 CONSTRAINT redis_cache_keys_replace PRIMARY KEY (id)
+);
+
+CREATE TABLE "public"."personel_task_replace" (
+"id" serial NOT NULL,
+"choosebean" varchar(255),
+"data_id" int4,
+"employee_id" int4,
+"participants_only" char(1) DEFAULT '0'::bpchar,
+"personnel_create_by" varchar(100),
+"datetime_create_time" int8,
+"personnel_modify_by" varchar(100),
+"datetime_modify_time" int8,
+"del_status" char(1) DEFAULT '0'::bpchar,
+"seas_pool_id" int8 DEFAULT 0,
+CONSTRAINT "personel_task_replace_pkey" PRIMARY KEY ("id")
 );

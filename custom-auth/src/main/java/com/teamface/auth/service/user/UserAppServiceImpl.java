@@ -19,7 +19,6 @@ import com.teamface.async.UserAsyncHandle;
 import com.teamface.auth.model.ScanCodeVo;
 import com.teamface.common.cache.ServiceResultCodeCache;
 import com.teamface.common.constant.Constant;
-import com.teamface.common.constant.DataTypes;
 import com.teamface.common.constant.RedisKey4Function;
 import com.teamface.common.model.ServiceResult;
 import com.teamface.common.model.TreeNode;
@@ -143,7 +142,8 @@ public class UserAppServiceImpl implements UserAppService
         // 已注册的手机号码，不会再发送短信码
         if (type == 1)
         {
-            StringBuilder builder = new StringBuilder("select count(*) from register_user where phone='").append(telephone.trim()).append("'");
+            StringBuilder builder =
+                new StringBuilder("select count(*) from register_user where phone='").append(telephone.trim()).append("' and del_status = ").append(Constant.CURRENCY_ZERO);
             int number = DAOUtil.executeCount(builder.toString());
             if (number > 0)
             {
@@ -151,26 +151,19 @@ public class UserAppServiceImpl implements UserAppService
                 return serviceResult;
             }
             
-            StringBuilder buf = new StringBuilder("select count(*) from account where login_name = ").append(telephone);
+            StringBuilder buf =
+                new StringBuilder("select count(*) from formal_user where phone = '").append(telephone).append("' and del_status = ").append(Constant.CURRENCY_ZERO);
             int count = DAOUtil.executeCount(buf.toString());
             if (count > 0)
             {
-                serviceResult.setCodeMsg(resultCode.get("common.phone.has.used"), "该手机号已经被使用");
+                serviceResult.setCodeMsg(resultCode.get("postprocess.register.user.error"), resultCode.getMsgZh("postprocess.register.user.error"));
                 return serviceResult;
             }
+            
         }
         if (type == 3)
         {
             StringBuilder queryBuilder = new StringBuilder();
-            queryBuilder.append("select count(*) from register_user where phone='");
-            queryBuilder.append(telephone.trim()).append("'");
-            int number = DAOUtil.executeCount(queryBuilder.toString());
-            if (number > 0)
-            {
-                serviceResult.setCodeMsg(resultCode.get("common.fail"), "该手机号码已存在");
-                return serviceResult;
-            }
-            queryBuilder.setLength(0);
             queryBuilder.append("select count(*) from account where login_name='");
             queryBuilder.append(telephone.trim()).append("'");
             int num = DAOUtil.executeCount(queryBuilder.toString());
@@ -708,9 +701,8 @@ public class UserAppServiceImpl implements UserAppService
             }
             return JsonResUtil.getResultJsonByIdent("postprocess.userName.error");
         }
+        // 账号ID
         String accountId = data.getString("id");
-        
-        
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("select a.* from acountinfo a left join company c on a.company_id = c.id  ")
             .append(" where  a.account_id = ")
@@ -728,7 +720,27 @@ public class UserAppServiceImpl implements UserAppService
             int status = date.getInteger("status");
             if (Constant.CURRENCY_ONE == status)
             {
-                return JsonResUtil.getResultJsonByIdent("postprocess.userName.disable.error");
+                // 如果最近登录禁用 则找当前最新可以登录的公司信息
+                queryBuilder.setLength(0);
+                queryBuilder.append("select a.* from acountinfo a left join company c on a.company_id = c.id  ")
+                    .append(" where  a.account_id = ")
+                    .append(accountId)
+                    .append(" and c.is_enable = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" and a.status = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" order by a.latest_update_time desc limit 1");
+                JSONObject dateJson = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
+                if (dateJson != null)
+                {
+                    employeeId = dateJson.getString("employee_id");
+                    companyId = dateJson.getString("company_id");
+                    infoId = dateJson.getString("id");
+                }
+                else
+                {
+                    return JsonResUtil.getResultJsonByIdent("postprocess.userName.disable.error");
+                }
             }
             else
             {
@@ -783,10 +795,8 @@ public class UserAppServiceImpl implements UserAppService
             timeKey.append("time".concat(accountId));
             timeKey.append("_");
             timeKey.append(RedisKey4Function.USER_LOGIN_INFO.getIndex());
-            
             // 正确归零
             JedisClusterHelper.del("time".concat(accountId));
-            
         }
         
         // 是否是有ip策略
@@ -853,7 +863,6 @@ public class UserAppServiceImpl implements UserAppService
         timeKey.append("_");
         timeKey.append(RedisKey4Function.USER_LOGIN_INFO.getIndex());
         
-        
         StringBuilder setKey = new StringBuilder();
         setKey.append("x");
         setKey.append("_");
@@ -875,7 +884,7 @@ public class UserAppServiceImpl implements UserAppService
                 sumNumber = Integer.parseInt(object.toString());
             }
             // 是否符合锁定
-            if (sumNumber + 1 == jsonObject.getInteger("pwd_lock"))
+            if (sumNumber + 1 == jsonObject.getInteger("pwd_lock") && sumNumber + 1 >jsonObject.getInteger("pwd_phone") )
             {
                 // 锁定15分钟
                 JedisClusterHelper.del(timeKey.toString());
@@ -1095,7 +1104,7 @@ public class UserAppServiceImpl implements UserAppService
         }
         // 公司信息
         StringBuilder queryBuf = new StringBuilder("select * from  company where id = ").append(info.getCompanyId());
-        List<JSONObject> companyDatas = DAOUtil.executeQuery4JSON(queryBuf.toString());
+        List<JSONObject> companyDatas = DAOUtil.executeQuery4JSON(queryBuf.toString(), null);
         if (!companyDatas.isEmpty())
         {
             resultJsonObject.put("companyInfo", companyDatas.get(0));
@@ -1309,8 +1318,16 @@ public class UserAppServiceImpl implements UserAppService
     private String commonToken(int clientFlag, String companyId, String accountId, String employeeId, String infoId, JSONObject jsonObject)
     {
         String jwtStr;
-        
-        long time = -1;
+        // 登录信息
+        StringBuilder strKey = new StringBuilder();
+        strKey.append(companyId);
+        strKey.append("_");
+        strKey.append(employeeId);
+        strKey.append("_");
+        strKey.append(RedisKey4Function.USER_LOGIN_INFO.getIndex());
+        strKey.append("_");
+        strKey.append(Constant.CURRENCY_ZERO);
+        int time = -1;
         if (clientFlag == Constant.CURRENCY_THREE && null != jsonObject)
         {
             if (null != jsonObject.getInteger("link_set"))
@@ -1318,29 +1335,38 @@ public class UserAppServiceImpl implements UserAppService
                 switch (jsonObject.getInteger("link_set"))
                 {
                     case 1:// 30分钟
-                        time = 30 * 60 * 1000;
+                        time = 30 * 60;
                         break;
                     case 2:// 1小时
-                        time = 60 * 60 * 1000;
+                        time = 60 * 60;
                         break;
                     case 3:// 3小时
-                        time = 3 * 60 * 60 * 1000;
+                        time = 3 * 60 * 60;
                         break;
                     case 4:// 1天
-                        time = 24 * 60 * 60 * 1000;
+                        time = 24 * 60 * 60;
                         break;
                     case 5:// 7天
-                        time = 7 * 24 * 60 * 60 * 1000;
+                        time = 7 * 24 * 60 * 60;
                         break;
                     default:
                         break;
                 }
             }
-            jwtStr = TokenMgr.createJWT(accountId, employeeId, companyId, infoId, time);
+            jwtStr = TokenMgr.createJWT(accountId, employeeId, companyId, infoId, -1);
+            if (jsonObject.getInteger("link_set") == Constant.CURRENCY_ZERO)
+            {
+                JedisClusterHelper.set(strKey.toString(), time);
+            }
+            else
+            {
+                JedisClusterHelper.set(strKey.toString(), time, time);
+            }
         }
         else
         {
-            jwtStr = TokenMgr.createJWT(accountId, employeeId, companyId, infoId, time);
+            jwtStr = TokenMgr.createJWT(accountId, employeeId, companyId, infoId, -1);
+            JedisClusterHelper.set(strKey.toString(), time);
         }
         return jwtStr;
     }
@@ -1408,7 +1434,7 @@ public class UserAppServiceImpl implements UserAppService
                 c.setTime(d);
                 c.add(Calendar.YEAR, 1);
                 StringBuilder savaBuilder =
-                    new StringBuilder("insert into formal_user(phone,company_name,user_name,start_time,end_time,edition,invite_code) values('").append(map.get("phone"))
+                    new StringBuilder("insert into formal_user(phone,company_name,user_name,start_time,end_time,edition,invite_code,customer_id) values('").append(map.get("phone"))
                         .append("','")
                         .append(map.get("companyName"))
                         .append("','")
@@ -1419,7 +1445,7 @@ public class UserAppServiceImpl implements UserAppService
                         .append(c.getTimeInMillis())
                         .append(",'0','")
                         .append(map.get("inviteCode"))
-                        .append("')");
+                        .append("',1)");
                 int count = DAOUtil.executeUpdate(savaBuilder.toString());
                 if (count <= 0)
                 {
@@ -1451,6 +1477,16 @@ public class UserAppServiceImpl implements UserAppService
                 }
                 else
                 {
+                    StringBuilder editBuilder = new StringBuilder();
+                    editBuilder.append(" update account set login_pwd = '");
+                    editBuilder.append(map.get("passWord"));
+                    editBuilder.append("' where  id = ");
+                    editBuilder.append(jsonMap.getLong("id"));
+                    int numberCount = DAOUtil.executeUpdate(editBuilder.toString());
+                    if (numberCount <= 0)
+                    {
+                        return JsonResUtil.getResultJsonByIdent("common.fail");
+                    }
                     accountId = jsonMap.getLong("id");
                 }
                 StringBuilder editBuilder = new StringBuilder("update invite set quantity = quantity - ").append(Constant.CURRENCY_ONE)
@@ -1563,7 +1599,7 @@ public class UserAppServiceImpl implements UserAppService
         ServiceResult<String> serviceResult = new ServiceResult<>();
         try
         {
-            InfoVo info = TokenMgr.obtainInfo(map.get("token").toString());
+            InfoVo info = TokenMgr.obtainInfo(map.get("token"));
             StringBuilder builder = new StringBuilder("SELECT * FROM ").append(accountTabl).append(" where id = ").append(info.getAccountId());
             JSONObject data = DAOUtil.executeQuery4FirstJSON(builder.toString());
             String dbPwd = data.getString("login_pwd");
@@ -1588,6 +1624,12 @@ public class UserAppServiceImpl implements UserAppService
                 new StringBuilder("update ").append(employeeTable).append(" set  role_id = ").append(Constant.CURRENCY_THREE).append(" where id = ").append(info.getEmployeeId());
             int count = DAOUtil.executeUpdate(updateBuilder.toString()); // 修改员工资料
             if (count <= 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
+            boolean falg = imChatService.updateGroupManager(map.get("token"), map.get("signId"));
+            if (!falg)
             {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
@@ -1793,8 +1835,14 @@ public class UserAppServiceImpl implements UserAppService
             if (number <= 0)
             {
                 StringBuilder insertBilder = new StringBuilder();
-                insertBilder.append(" insert into ").append(safeTable).append("(company_id,link_set)").append(" values(").append(info.getCompanyId()).append(",").append(
-                    map.get("link_set"));
+                insertBilder.append(" insert into ")
+                    .append(safeTable)
+                    .append("(company_id,link_set)")
+                    .append(" values(")
+                    .append(info.getCompanyId())
+                    .append(",")
+                    .append(map.get("link_set"))
+                    .append(")");
                 int sum = DAOUtil.executeUpdate(insertBilder.toString());
                 if (sum <= 0)
                 {
@@ -2266,6 +2314,28 @@ public class UserAppServiceImpl implements UserAppService
         }
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         return serviceResult;
+    }
+    
+    /**
+     * 获取公司banner图
+     */
+    @Override
+    public JSONObject queryCompanyBanner(String token)
+    {
+        JSONObject jsonObject = new JSONObject();
+        try
+        {
+            InfoVo info = TokenMgr.obtainInfo(token);
+            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder.append("select banner from company where id = ");
+            queryBuilder.append(info.getCompanyId());
+            jsonObject = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+        }
+        return jsonObject;
     }
     
 }

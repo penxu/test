@@ -719,10 +719,12 @@ public class BusinessDAOUtil
                     field.put("name", fieldName);
                     field.put("label", comment);
                     field.put("value", arrayValue);
-                    if (fieldName.contains(Constant.TYPE_PICKLIST))
+                    if (fieldName.contains(Constant.TYPE_PICKLIST) || fieldName.contains(Constant.TYPE_ATTACHMENT) || fieldName.contains(Constant.TYPE_PICTURE)
+                        || fieldName.contains(Constant.TYPE_PERSONNEL) || fieldName.contains(Constant.TYPE_MUTLI_PICKLIST) || fieldName.contains(Constant.TYPE_REFERENCE)
+                        || fieldName.contains(Constant.TYPE_MULTI))
                     {
                         JSONArray array = JSONArray.parseArray(arrayValue.toString());
-                        field.put("value", array);
+                        field.put("value", array == null ? new JSONArray() : array);
                     }
                     else
                     {
@@ -807,7 +809,7 @@ public class BusinessDAOUtil
      */
     public static JSONObject getTableDataWithComment(Map<String, String> commentMap, String sql)
     {
-        JSONObject row = new JSONObject();
+        JSONObject row = new JSONObject(true);
         if (StringUtils.isEmpty(sql))
         {
             return row;
@@ -1065,9 +1067,14 @@ public class BusinessDAOUtil
     {
         StringBuilder sqlSB = new StringBuilder();
         int ostNum = (pageNum - 1) * pageSize;
-        sqlSB.append(sql).append(" limit ").append(pageSize).append(" OFFSET ").append(ostNum);
-        List<JSONObject> pageDataList = DAOUtil.executeQuery4JSON(sqlSB.toString());
-        List<Map<String, Object>> allDataList = DAOUtil.executeQuery(sql);
+        List<JSONObject> pageDataList = new ArrayList<>();
+        List<Map<String, Object>> allDataList = new ArrayList<>();
+        if (org.apache.commons.lang3.StringUtils.isNotEmpty(sql))
+        {
+            sqlSB.append(sql).append(" limit ").append(pageSize).append(" OFFSET ").append(ostNum);
+            pageDataList = DAOUtil.executeQuery4JSON(sqlSB.toString());
+            allDataList = DAOUtil.executeQuery(sql);
+        }
         // 分页信息
         JSONObject pageJson = new JSONObject();
         int totalRows = allDataList.size();
@@ -1123,6 +1130,30 @@ public class BusinessDAOUtil
      * @Description:
      */
     public static long getNextval4Table(String bean, String companyId)
+    {
+        StringBuilder sqlSB = new StringBuilder();
+        String tableName = DAOUtil.getTableName(bean, companyId);
+        sqlSB.append("select pa.adsrc from pg_attrdef pa join pg_class pc on pa.adrelid=pc.oid where pa.adnum=1 and pc.relname ='").append(tableName).append("'");
+        List<Map<String, Object>> resultLS = DAOUtil.executeQuery(sqlSB.toString());
+        for (Map<String, Object> map : resultLS)
+        {
+            String seq = String.valueOf(map.get("adsrc"));
+            sqlSB.setLength(0);
+            sqlSB.append("select ").append(seq);
+            return (long)(DAOUtil.executeQuery4Object(sqlSB.toString()));
+        }
+        return 0;
+    }
+    
+    /**
+     * 获取指定表的下一个序列值
+     * 
+     * @param bean
+     * @param companyId
+     * @return
+     * @Description:
+     */
+    public static long getNextval4Table(String bean, long companyId)
     {
         StringBuilder sqlSB = new StringBuilder();
         String tableName = DAOUtil.getTableName(bean, companyId);
@@ -1206,9 +1237,19 @@ public class BusinessDAOUtil
         }
         String AUTO_SEQUENCE_NUMBER = "auto_sequence_number";
         String table = DAOUtil.getTableName(AUTO_SEQUENCE_NUMBER, companyId);
+        SimpleDateFormat myfmt = new SimpleDateFormat(dateFormat);
+        String date = myfmt.format(new Date());
         
         StringBuilder sql = new StringBuilder();
         sql.append("select auto_number from ").append(table).append(" where bean = '").append(bean).append("'").append(" and field_name = '").append(name).append("'");
+        if (StringUtils.isEmpty(date))
+        {
+            sql.append(" and date_format is null");
+        }
+        else
+        {
+            sql.append(" and date_format = '").append(date).append("'");
+        }
         int autoNumber = DAOUtil.executeCount(sql.toString());
         if (autoNumber == -1)
         {
@@ -1217,6 +1258,7 @@ public class BusinessDAOUtil
             JSONObject saveDataJson = new JSONObject();
             saveDataJson.put("auto_number", autoNumber);
             saveDataJson.put("field_name", name);
+            saveDataJson.put("date_format", date);
             saveDataJson.put("bean", bean);
             JSONObject dataJson = new JSONObject();
             dataJson.put("bean", AUTO_SEQUENCE_NUMBER);
@@ -1229,21 +1271,19 @@ public class BusinessDAOUtil
         {
             autoNumber++;
             sql.setLength(0);
-            sql.append(" update ")
-                .append(table)
-                .append(" set auto_number = ")
-                .append(autoNumber)
-                .append(" where bean = '")
-                .append(bean)
-                .append("'")
-                .append(" and field_name = '")
-                .append(name)
-                .append("'");
+            sql.append(" update ").append(table).append(" set auto_number = ").append(autoNumber);
+            if (StringUtils.isEmpty(date))
+            {
+                sql.append(", date_format=Null");
+            }
+            else
+            {
+                sql.append(", date_format = ").append(date);
+            }
+            sql.append(" where bean = '").append(bean).append("'").append(" and field_name = '").append(name).append("'");
             DAOUtil.executeUpdate(sql.toString());
         }
         StringBuilder autoNumSB = new StringBuilder();
-        SimpleDateFormat myfmt = new SimpleDateFormat(dateFormat);
-        String date = myfmt.format(new Date());
         String num = String.format("%0" + index.length() + "d", autoNumber);
         autoNumSB.append(fix).append(date).append(num);
         return autoNumSB.toString();
@@ -1339,4 +1379,5 @@ public class BusinessDAOUtil
         }
         return depmentIDSB.toString();
     }
+    
 }

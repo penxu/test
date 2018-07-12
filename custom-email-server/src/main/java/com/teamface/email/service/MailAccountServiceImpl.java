@@ -66,7 +66,7 @@ public class MailAccountServiceImpl implements MailAccountService
             serviceResult.setCodeMsg(resultCode.get("postprocess.mail.account.existence.error"), resultCode.getMsgZh("postprocess.mail.account.existence.error"));
             return serviceResult;
         }
-        Long defaultStatus = mailAccountInfo.getLong("account_default") == null ? 0l : 1l;
+        Long defaultStatus = mailAccountInfo.getLong("account_default") == null ? 0L : 1L;
         // 判断新增账户是否为默认账户 如果是则修改以前默认账户为非默认
         if (defaultStatus == 1)
         {

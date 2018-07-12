@@ -701,7 +701,7 @@ public class SubmenuAppServiceImpl implements SubmenuAppService
         // 获取模块菜单
         String table = DAOUtil.getTableName("application_module_submenu", companyId.toString());
         StringBuilder builder = new StringBuilder();
-        builder.append("select id, name, allot_employee, type, ").append(Constant.FIELD_CREATE_BY).append(" from ").append(table);
+        builder.append("select id, name, high_where, allot_employee, type, ").append(Constant.FIELD_CREATE_BY).append(" from ").append(table);
         builder.append(" where ").append(Constant.FIELD_DEL_STATUS).append("=0 and module_id=");
         builder.append(map.get("moduleId")).append(" order by type,topper");
         List<JSONObject> submenu = DAOUtil.executeQuery4JSON(builder.toString());
@@ -725,7 +725,11 @@ public class SubmenuAppServiceImpl implements SubmenuAppService
             else
             {// 1：本人添加的子菜单、别人共享给我的菜单（共享?）
                 otherSubmenu.add(json);
-                if (json.getLong("personnel_create_by") == employeeId)
+                if (roleId == 1 || roleId == 2)
+                {// 企业所有者、系统管理员，才有操作显示列权限
+                    json.put("editViewFieldsFlag", "1");// 0无权操作显示列，1有权操作显示列
+                }
+                else if (json.getLong("personnel_create_by") == employeeId)
                 {// 子菜单创建者，才有操作显示列权限
                     json.put("editViewFieldsFlag", "1");// 0无权操作显示列，1有权操作显示列
                 }
@@ -862,6 +866,25 @@ public class SubmenuAppServiceImpl implements SubmenuAppService
         sql.append("select count(1) from ").append(table).append(" where type=1 and employee_id=").append(employeeId).append(" and module_id=").append(ruleObj.get("moduleId"));
         Integer count = DAOUtil.executeCount(sql.toString());
         JSONObject basic = ruleObj.getJSONObject("basics");
+        // 判断名称是否重复
+        if (basic.containsKey("name") && !StringUtils.isEmpty(basic.getString("name")))
+        {
+            sql.setLength(0);
+            sql.append("select count(1) from ")
+                .append(table)
+                .append(" where type=1 and name='")
+                .append(basic.getString("name"))
+                .append("' and module_id=")
+                .append(ruleObj.get("moduleId"));
+            Integer exist = DAOUtil.executeCount(sql.toString());
+            if (exist > 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.submenu.name.is.exist"), resultCode.getMsgZh("common.submenu.name.is.exist"));
+                return serviceResult;
+                
+            }
+            
+        }
         basic.put("id", moduleMenuId);
         basic.put("topper", count + 1);
         basic.put("module_id", ruleObj.get("moduleId"));
@@ -972,7 +995,7 @@ public class SubmenuAppServiceImpl implements SubmenuAppService
         StringBuilder sql = new StringBuilder();
         String table = DAOUtil.getTableName("application_module_submenu", companyId);
         StringBuilder builder = new StringBuilder();
-        builder.append("select * from").append(table).append(" where id=").append(map.get("id"));
+        builder.append(" select * from ").append(table).append(" where id=").append(map.get("id"));
         List<JSONObject> list = DAOUtil.executeQuery4JSON(builder.toString());
         if (list != null && list.size() > 0)
         {
@@ -1009,13 +1032,33 @@ public class SubmenuAppServiceImpl implements SubmenuAppService
             serviceResult.setCodeMsg(resultCode.get("common.req.param.error"), resultCode.getMsgZh("common.req.param.error"));
             return serviceResult;
         }
-        String menuId = basic.getString("id");
-        basic.remove("id");// 移除ID
         String token = map.get("token");
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         Long employeeId = info.getEmployeeId();
         String submenuTable = DAOUtil.getTableName("application_module_submenu", companyId);
+        StringBuilder sql = new StringBuilder();
+        String menuId = basic.getString("id");
+        // 判断名称是否重复
+        if (basic.containsKey("name") && !StringUtils.isEmpty(basic.getString("name")))
+        {
+            sql.append("select count(1) from ")
+                .append(submenuTable)
+                .append(" where type=1 and name='")
+                .append(basic.getString("name"))
+                .append("' and module_id=")
+                .append(ruleObj.get("moduleId"))
+                .append(" and id != ").append(menuId);
+            Integer exist = DAOUtil.executeCount(sql.toString());
+            if (exist > 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.submenu.name.is.exist"), resultCode.getMsgZh("common.submenu.name.is.exist"));
+                return serviceResult;
+                
+            }
+            
+        }
+        basic.remove("id");// 移除ID
         StringBuilder builder = new StringBuilder();
         builder.append("select ").append(Constant.FIELD_CREATE_BY).append(" from ").append(submenuTable).append(" where type=1 and id=").append(menuId);
         List<JSONObject> list = DAOUtil.executeQuery4JSON(builder.toString());

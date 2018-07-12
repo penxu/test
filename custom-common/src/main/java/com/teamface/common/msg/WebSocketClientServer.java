@@ -247,8 +247,9 @@ public class WebSocketClientServer extends WebSocketClient
                 receiveStatus = true;
             }
         }
-        else
+        else {
             linkRetry = false;
+        }
         log.debug("receiveMessage, end !");
     }
     

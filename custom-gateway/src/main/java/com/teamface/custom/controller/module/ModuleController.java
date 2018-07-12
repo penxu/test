@@ -216,7 +216,7 @@ public class ModuleController
             {
                 return JsonResUtil.getResultJsonByIdent("common.req.param.error");
             }
-            jsonObject = moduleAppService.queryInitData(token, bean);
+            jsonObject = moduleAppService.queryInitData(token, bean, request.getParameter("dynamicFlag"));
             return JsonResUtil.getSuccessJsonObject(jsonObject);
         }
         catch (Exception e)

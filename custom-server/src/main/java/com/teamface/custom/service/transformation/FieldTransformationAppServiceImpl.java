@@ -131,11 +131,16 @@ public class FieldTransformationAppServiceImpl implements FieldTransformationApp
             return serviceResult;
         }
         
-        boolean result = LayoutUtil.saveModuleSetLayout(fieldJson, Constant.FIELD_COLLECTION);
-        if (!result)
+        boolean flag = LayoutUtil.saveModuleSetLayout(fieldJson, Constant.FIELD_COLLECTION);
+        if (flag)
         {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+            serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         }
+        else
+        {
+            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.transform.name.is.exist"));
+        }
+        
         return serviceResult;
     }
     
@@ -187,10 +192,18 @@ public class FieldTransformationAppServiceImpl implements FieldTransformationApp
         {
             return serviceResult;
         }
-        LayoutUtil.modifyModuleSetLayout(fieldJson, Constant.FIELD_COLLECTION);
-        serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
-        return serviceResult;
         
+        boolean flag = LayoutUtil.modifyModuleSetLayout(fieldJson, Constant.FIELD_COLLECTION);
+        if (flag)
+        {
+            serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
+        }
+        else
+        {
+            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.transform.name.is.exist"));
+        }
+        
+        return serviceResult;
     }
     
 }

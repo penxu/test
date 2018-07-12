@@ -7,10 +7,10 @@ import com.teamface.common.util.PropertiesConfigObject;
 public class MailConstant
 {
     // 获取配置文件实例
-    private static final PropertiesConfigObject properties = PropertiesConfigObject.getInstance();
+    private static final PropertiesConfigObject PROPETIES = PropertiesConfigObject.getInstance();
     
     // 获取常用配置对象
-    private static final Configuration comment = properties.getComment();
+    private static final Configuration COMMENT = PROPETIES.getComment();
     
     /**************************
      * 邮箱存储类型(126) INBOX, 草稿箱, 已发送, 已删除, 垃圾邮件, 病毒邮件, 广告邮件, 订阅邮件
@@ -66,7 +66,7 @@ public class MailConstant
     // 值
     public static final int SQL_POSITION_VALUE = 2;
     
-    public static final String MAIL_SETTINGS_COLLECTION = comment.getString("mongoDB.emailSettingsColl");
+    public static final String MAIL_SETTINGS_COLLECTION = COMMENT.getString("mongoDB.emailSettingsColl");
     
     /**************************
      * 1 收件箱 2 已发送 3 草稿箱 4 已删除 5 垃圾箱

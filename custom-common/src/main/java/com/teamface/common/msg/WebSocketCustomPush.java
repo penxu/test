@@ -75,9 +75,14 @@ public class WebSocketCustomPush
                 log.warn("Websocket is not connecting ......");
                 Thread.sleep(3000);
                 if (!flag)
+                {
                     flag = true;
+                }
                 else
+                {
                     return false;
+                }
+                
             }
             webSocketClient.pushMessage(reqData);
         }
@@ -142,9 +147,13 @@ public class WebSocketCustomPush
                 log.error(e.getMessage(), e);
             }
             if (!flag)
+            {
                 flag = true;
+            }
             else
+            {
                 return false;
+            }
         }
         log.warn("推送数据：" + pushPojo.getMessage());
         // 发送请求
@@ -205,9 +214,14 @@ public class WebSocketCustomPush
                 log.error(e.getMessage(), e);
             }
             if (!flag)
+            {
                 flag = true;
+            }
             else
+            {
                 return false;
+            }
+            
         }
         log.warn("推送数据：" + pushPojo.getMessage());
         // 发送请求

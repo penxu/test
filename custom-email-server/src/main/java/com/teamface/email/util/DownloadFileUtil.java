@@ -78,7 +78,48 @@ public class DownloadFileUtil
             }
             String bucketName = Constant.FLIE_LIBRARY_NAME;
             // 保存附件到路径
-            OSSUtil.getInstance().getFile(bucketName, fileName, filePath);
+            InputStream is = OSSUtil.getInstance().getFile(bucketName, fileName);
+            OutputStream fio = null;
+            BufferedInputStream bis = null;
+            BufferedOutputStream bio = null;
+            try
+            {
+                fio = new FileOutputStream(new File(filePath));
+                bis = new BufferedInputStream(is);
+                bio = new BufferedOutputStream(fio);
+                int len = -1;
+                byte[] b = new byte[1024 * 1024];
+                while ((len = bis.read(b)) != -1)
+                {
+                    bio.write(b, 0, len);
+                }
+            }
+            catch (IOException e)
+            {
+                log.error(e.getMessage(), e);
+            }
+            finally
+            {
+                try
+                {
+                    if (null != fio)
+                    {
+                        fio.close();
+                    }
+                    if (null != bis)
+                    {
+                        bis.close();
+                    }
+                    if (null != bio)
+                    {
+                        bio.close();
+                    }
+                }
+                catch (IOException e)
+                {
+                    log.error(e.getMessage(), e);
+                }
+            }
         }
         catch (Exception e)
         {

@@ -95,16 +95,7 @@ public class ModuleOperationController
         }
         catch (Exception e)
         {
-            String message = e.getMessage();
             LOG.error(" saveData 异常 " + e.getMessage(), e);
-            if (message.equals("startProcessFail"))
-            {
-                return JsonResUtil.getResultJsonObject(resultCode.get("common.fail"), "流程启动失败！");
-            }
-            if (message.equals("notFindApprover"))
-            {
-                return JsonResUtil.getResultJsonObject(resultCode.get("common.fail"), "未找到审批人！");
-            }
             return JsonResUtil.getFailJsonObject();
         }
         if (!serviceResult.isSucces())
@@ -221,9 +212,9 @@ public class ModuleOperationController
      */
     @RequestMapping(value = "/findDataRelationsForPc", method = RequestMethod.GET)
     public @ResponseBody JSONObject findDataRelationsForPc(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token,
-        @RequestHeader(DataTypes.REQUEST_HEADER_CLIENDT_FLAG) String clientFlag, @RequestParam(required = true) String bean)
+        @RequestHeader(DataTypes.REQUEST_HEADER_CLIENDT_FLAG) String clientFlag, @RequestParam(required = true) String bean , @RequestParam(required = false) String flag)
     {
-        return JsonResUtil.getSuccessJsonObject(moduleOperationAppService.findDataRelationsForPc(token, bean, clientFlag));
+        return JsonResUtil.getSuccessJsonObject(moduleOperationAppService.findDataRelationsForPc(token, bean, clientFlag, flag));
     }
     
     /**
@@ -544,4 +535,16 @@ public class ModuleOperationController
         
     }
     
+    /**
+     * @param reqJson
+     * @param token
+     * @return List
+     * @Description:根据模块bean获取模块id
+     */
+    @RequestMapping(value = "/getModuleIdByModule", method = RequestMethod.GET)
+    public @ResponseBody JSONObject getModuleIdByModule(@RequestParam(value = "bean", required = true) String bean, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    {
+        return JsonResUtil.getSuccessJsonObject(moduleOperationAppService.getModuleIdByModule(token, bean));
+        
+    }
 }

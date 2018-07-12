@@ -46,15 +46,22 @@ public class RegulationOperationUtil
         }
         if (StringUtil.isEmpty(seniorWhere) && whereLS.size() > 1)
         {
-            return whereLS.get(0);
+            boolean logicResult = true;
+            for (Boolean b : whereLS)
+            {
+                logicResult = logicResult & b;
+            }
+            return logicResult;
         }
         else
         {
             seniorWhere = seniorWhere.toUpperCase().replace("AND", " AND ").replace("OR", " OR ");
             int index = 0;
-            Pattern r = Pattern.compile("(\\d+)");
-            Matcher m = r.matcher(seniorWhere);
-            if(!StringUtils.isEmpty(seniorWhere)){
+            String r = "(\\d+)";
+            Pattern p = Pattern.compile(r);
+            Matcher m = p.matcher(seniorWhere);
+            if (!StringUtils.isEmpty(seniorWhere))
+            {
                 while (m.find())
                 {
                     int findNum = Integer.parseInt(m.group(1));
@@ -79,7 +86,9 @@ public class RegulationOperationUtil
                     }
                     index = index1 + 1;
                 }
-            }else{
+            }
+            else
+            {
                 return whereLS.get(0);
             }
             
@@ -100,31 +109,31 @@ public class RegulationOperationUtil
         String field = regulation.getString("field_value").split(":")[0];
         String operator = regulation.getString("operator_value").split(":")[0];
         String result = regulation.getString("result_value");
-        if (operator.equals("CONTAIN"))
+        if ("CONTAIN".equals(operator))
         {
             resultStatus = mail.getString(field).indexOf(result) >= 0 ? true : false;
         }
-        if (operator.equals("NCONTAIN"))
+        if ("NCONTAIN".equals(operator))
         {
             resultStatus = mail.getString(field).indexOf(result) >= 0 ? false : true;
         }
-        if (operator.equals("GREATER"))
+        if ("GREATER".equals(operator))
         {
             resultStatus = Integer.valueOf(mail.getString(field)) > Integer.valueOf(result) ? true : false;
         }
-        if (operator.equals("LESS"))
+        if ("LESS".equals(operator))
         {
             resultStatus = Integer.valueOf(mail.getString(field)) < Integer.valueOf(result) ? true : false;
         }
-        if (operator.equals("EQUALS"))
+        if ("EQUALS".equals(operator))
         {
             resultStatus = Integer.valueOf(mail.getString(field)) == Integer.valueOf(result) ? true : false;
         }
-        if (operator.equals("GREATERE"))
+        if ("GREATERE".equals(operator))
         {
             resultStatus = Integer.valueOf(mail.getString(field)) >= Integer.valueOf(result) ? true : false;
         }
-        if (operator.equals("LESSE"))
+        if ("LESSE".equals(operator))
         {
             resultStatus = Integer.valueOf(mail.getString(field)) <= Integer.valueOf(result) ? true : false;
         }

@@ -3,6 +3,7 @@ package com.teamface.im.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -59,7 +60,7 @@ public class DynamicParameterUtil
     public static Long getSuperiorSignIdByField(String field, String beanName, Long companyId, Long id)
     {
         String beanField = field.substring(0, field.lastIndexOf("_"));
-        StringBuilder querySignIdSql = new StringBuilder().append("select a.id from department_center_")
+        StringBuilder querySignIdSql = new StringBuilder().append("select a.id,a.department_id,a.employee_id from department_center_")
             .append(companyId)
             .append(" dcn join (select * from ")
             .append(beanName)
@@ -77,7 +78,32 @@ public class DynamicParameterUtil
         JSONObject result = DAOUtil.executeQuery4FirstJSON(querySignIdSql.toString());
         if (null != result)
         {
-            return result.getLongValue("id");
+            // 查询负责人员工ID
+            StringBuilder queryPrincipalSqlSB = new StringBuilder("select ").append(beanField).append(" from ");
+            queryPrincipalSqlSB.append(beanName).append(" where id = ").append(id);
+            JSONObject principalObj = DAOUtil.executeQuery4FirstJSON(queryPrincipalSqlSB.toString());
+            // 判断主部门负责人是否是本人 如果不是返回员工signId 如果是查询部门上级负责人的signId
+            if (result.getLong("employee_id") != principalObj.getLong(beanField))
+            {
+                return result.getLong("id");
+            }
+            // 根据本级部门id查询上级部门负责人的signId
+            querySignIdSql.setLength(0);
+            querySignIdSql.append(" select * from  department_center_");
+            querySignIdSql.append(companyId);
+            querySignIdSql.append(" c left join acountinfo a on c.employee_id = a.employee_id  where  c.department_id = ( select parent_id from department_");
+            querySignIdSql.append(companyId);
+            querySignIdSql.append(" where id  =  ");
+            querySignIdSql.append(result.getLong("department_id"));
+            querySignIdSql.append(" and status = 0 ) and c.leader=1  and  c.status = 0  and a.company_id =  ");
+            querySignIdSql.append(companyId);
+            JSONObject superPrincipal = DAOUtil.executeQuery4FirstJSON(querySignIdSql.toString());
+            // 如果有上级部门的负责人则返回上级部门负责人
+            if (!Objects.isNull(superPrincipal))
+            {
+                return superPrincipal.getLong("id");
+            }
+            
         }
         return null;
     }
@@ -140,11 +166,9 @@ public class DynamicParameterUtil
      */
     public static void getSignIdByCompany(List<String> alertPeoples, Long companyId)
     {
-        StringBuilder queryCompanySqlSB = new StringBuilder().append("select a.id from acountinfo a,employee_")
-            .append(companyId)
-            .append(" e where a.company_id = ")
-            .append(companyId)
-            .append(" and a.employee_id = e.id and e.status = 0 and del_status = 0");
+        StringBuilder queryCompanySqlSB =
+            new StringBuilder().append("select a.id from acountinfo a,employee_").append(companyId).append(" e where a.company_id = ").append(companyId).append(
+                " and a.employee_id = e.id and e.status = 0 and del_status = 0");
         List<Map<String, Object>> patchMems = DAOUtil.executeQuery(queryCompanySqlSB.toString());
         for (int k = 0; k < patchMems.size(); k++)
         {
@@ -199,5 +223,30 @@ public class DynamicParameterUtil
         {
             alertPeoples.add(String.valueOf(patchMems.get(k).get("id")));
         }
+    }
+    
+    /**
+     * 
+     * @param field
+     * @param beanName
+     * @param companyId
+     * @param id
+     * @return
+     * @Description:查询转移负责人signId
+     */
+    public static Long getTransferSignIdByField(String beanName, Long companyId, Long id)
+    {
+        StringBuilder querySignIdSql = new StringBuilder().append("select a.id from acountinfo a ,")
+            .append(beanName)
+            .append(" bean where a.company_id = ")
+            .append(companyId)
+            .append(" and a.employee_id = bean.personnel_principal and bean.id = ")
+            .append(id);
+        JSONObject result = DAOUtil.executeQuery4FirstJSON(querySignIdSql.toString());
+        if (null != result)
+        {
+            return result.getLongValue("id");
+        }
+        return null;
     }
 }

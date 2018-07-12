@@ -35,7 +35,7 @@ public class AssigneeServer
      */
     public String getDeparmentPrincipal(String companyId, String starter, Integer level, Boolean useUpper)
     {
-        log.warn(String.format("parameters{args0:%s,args1:%s,args2:%s,args3:%s} start!", companyId,starter,level,useUpper));
+        log.warn(String.format("parameters{args0:%s,args1:%s,args2:%s,args3:%s} start!", companyId, starter, level, useUpper));
         StringBuilder sqlSB = new StringBuilder();
         String tableName = DAOUtil.getTableName(Constant.TABLE_DEPARTMENT_CENTER, companyId);
         sqlSB.append("select department_id,leader from ").append(tableName).append(" where status=0 and employee_id=").append(starter);
@@ -58,21 +58,25 @@ public class AssigneeServer
                 {
                     level = level + 1;
                 }
-                if(level>size)
+                if (level > size)
                 {
                     return "";
                 }
                 String finalDepId = dep[size - level];
-                String userId = getDeparmentPrincipal(companyId,finalDepId);
-                if ("0".equals(userId))
+                String userId = getDeparmentPrincipal(companyId, finalDepId);
+                // 若该审批人空缺，由其在通讯录中的上级部门负责人代审批
+                if (useUpper)
                 {
-                    level = level + 1;
-                    if (level > size)
+                    while (StringUtils.isEmpty(userId))
                     {
-                        return null;
+                        level = level + 1;
+                        if (level > size)
+                        {
+                            return null;
+                        }
+                        finalDepId = dep[size - level];
+                        userId = getDeparmentPrincipal(companyId, finalDepId);
                     }
-                    finalDepId = dep[size - level];
-                    userId = getDeparmentPrincipal(companyId, finalDepId);
                 }
                 log.warn("getDeparmentPrincipal deparmentId:" + finalDepId + ",employee:" + userId);
                 return userId;
@@ -91,14 +95,18 @@ public class AssigneeServer
      */
     public String getDeparmentPrincipal(String companyId, String deparmentId)
     {
-        log.warn(String.format("parameters{args0:%s,args1:%s} start!", companyId,deparmentId));
+        log.warn(String.format("parameters{args0:%s,args1:%s} start!", companyId, deparmentId));
         String tableName = DAOUtil.getTableName(Constant.TABLE_DEPARTMENT_CENTER, companyId);
         StringBuilder sqlSB = new StringBuilder("select employee_id from ");
         sqlSB.append(tableName).append(" where status=0 and leader=1 and department_id=").append(deparmentId);
         
-        Object userId = DAOUtil.executeQuery4Object(sqlSB.toString());
-        log.warn("end!"+userId.toString());
-        return userId==null?"":userId.toString();
+        JSONObject userJSON = DAOUtil.executeQuery4FirstJSON(sqlSB.toString());
+        if (userJSON == null)
+        {
+            return "";
+        }
+        log.warn("end!" + userJSON.getString("employee_id"));
+        return userJSON.getString("employee_id");
     }
     
     /**
@@ -111,7 +119,7 @@ public class AssigneeServer
      */
     public List<String> getDeparmentPrincipals(String companyId, String finalDeparmentId, String starter)
     {
-        log.warn(String.format("parameters{args0:%s,args1:%s,args2:%s} start!", companyId,finalDeparmentId,starter));
+        log.warn(String.format("parameters{args0:%s,args1:%s,args2:%s} start!", companyId, finalDeparmentId, starter));
         List<String> assignees = new ArrayList<>();
         String tableName = DAOUtil.getTableName(Constant.TABLE_DEPARTMENT_CENTER, companyId);
         StringBuilder sqlSB = new StringBuilder();
@@ -127,7 +135,7 @@ public class AssigneeServer
             int size = dep.length;
             if (size > 0)
             {
-                if(leader==1 && size==1)
+                if (leader == 1 && size == 1)
                 {
                     return assignees;
                 }
@@ -192,7 +200,7 @@ public class AssigneeServer
      */
     public List<String> getEmployees4Role(String companyId, String roleId)
     {
-        log.warn(String.format("parameters{args0:%s,args1:%s} start!", companyId,roleId));
+        log.warn(String.format("parameters{args0:%s,args1:%s} start!", companyId, roleId));
         List<String> assignees = new ArrayList<>();
         StringBuilder sqlSB = new StringBuilder();
         String tableName = DAOUtil.getTableName(Constant.TABLE_EMPLOYEE, companyId);
@@ -216,30 +224,31 @@ public class AssigneeServer
      * @return boolean
      * @Description:判断是否符合分支条件
      */
-    public boolean executeConditionExpression(String sql,String dataId)
+    public boolean executeConditionExpression(String sql, String dataId)
     {
-        if(StringUtils.isEmpty(sql))
+        if (StringUtils.isEmpty(sql))
         {
             return true;
         }
         String alias = "";
         sql = sql.replace(Constant.VAR_QUOTES, "'");
         StringBuilder sqlSB = new StringBuilder(sql);
-        if(sql.contains(Constant.MAIN_TABLE_ALIAS))
+        if (sql.contains(Constant.MAIN_TABLE_ALIAS))
         {
-            alias = Constant.MAIN_TABLE_ALIAS+".";
+            alias = Constant.MAIN_TABLE_ALIAS + ".";
         }
-        if(!sql.toLowerCase().contains("where"))
+        if (!sql.toLowerCase().contains("where"))
         {
             sqlSB.append(" where 1 = 1 ");
         }
         sqlSB.append(" and ").append(alias).append("id=").append(dataId);
-        log.warn(String.format("parameters{args0:%s} start!",sqlSB.toString()));
+        log.warn(String.format("parameters{args0:%s} start!", sqlSB.toString()));
         boolean flag = false;
         try
         {
-//            Map<String, Object> resultMap = DAOUtil.executeQuery4One(sqlSB.toString());
-            JSONObject resultJSON = DAOUtil.executeQuery4FirstJSON(sqlSB.toString());//.executeQuery4One(sqlSB.toString());
+            // Map<String, Object> resultMap =
+            // DAOUtil.executeQuery4One(sqlSB.toString());
+            JSONObject resultJSON = DAOUtil.executeQuery4FirstJSON(sqlSB.toString());// .executeQuery4One(sqlSB.toString());
             flag = null != resultJSON;
             log.warn("executeConditionExpression:" + sqlSB.toString() + ",hasData:" + flag);
         }
@@ -259,7 +268,7 @@ public class AssigneeServer
      */
     public List<String> getMultipleUser(String assignees)
     {
-        log.warn(String.format("parameters{args0:%s} start!",assignees));
+        log.warn(String.format("parameters{args0:%s} start!", assignees));
         List<String> users = new ArrayList<>();
         if (!StringUtils.isEmpty(assignees))
             for (String assignee : assignees.split(","))

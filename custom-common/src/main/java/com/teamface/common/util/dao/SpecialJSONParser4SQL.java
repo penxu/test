@@ -1,20 +1,23 @@
 package com.teamface.common.util.dao;
 
+import java.text.SimpleDateFormat;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.function.ObjDoubleConsumer;
 
+import org.apache.commons.math3.stat.descriptive.StatisticalSummaryValues;
 import org.apache.log4j.Logger;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.constant.Constant;
 
-public class SpecialJSONParser4SQL 
+public class SpecialJSONParser4SQL
 {
-
-	static Logger log = Logger.getLogger(JSONParser4SQL.class);
-	   
+    
+    static Logger log = Logger.getLogger(JSONParser4SQL.class);
+    
     /**
      * @param json
      * @param companyId 公司编号
@@ -55,54 +58,55 @@ public class SpecialJSONParser4SQL
             
             if (value instanceof JSONArray)
             {
-				if (key.equals("allot_employee") || key.equals("allot_manager")) 
-				{
-	                JSONArray valueArray = (JSONArray)value;
-	                valueSB.setLength(0);
-	                Iterator<Object> iterator = valueArray.iterator();
-	                
-	                while (iterator.hasNext())
-	                {
-	                    if (valueSB.length() > 0)
-	                    {
-	                        valueSB.append(",");//0部门 1成员 2角色  3 动态成员 4 公司
-	                    }
-	                    JSONObject item = (JSONObject)iterator.next();
-	                    valueSB.append(item.get("type")).append("-").append(item.get("id"));
-	                }
-	                
-	                fileds.append(entry.getKey()).append(",").append(entry.getKey() + Constant.PICKUP_VALUE_FIELD_SUFFIX);
-	                values.append("'").append(value).append("',").append("'").append(valueSB).append("'");
-	                
-				} else 
-				{
-
-					StringBuilder mvalueSB = new StringBuilder();
-					JSONArray valueArray = (JSONArray)value;
-					valueSB.setLength(0);
-					Iterator<Object> iterator = valueArray.iterator();
-					
-					while (iterator.hasNext())
-					{
-						if (valueSB.length() > 0)
-						{
-							valueSB.append(",");
-							mvalueSB.append("-");
-						}
-						JSONObject item = (JSONObject)iterator.next();
-						valueSB.append(item.get("value"));
-						mvalueSB.append(item.get("value"));
-					}
-					fileds.append(entry.getKey()).append(",").append(entry.getKey() + Constant.PICKUP_VALUE_FIELD_SUFFIX);
-					if (key.startsWith(Constant.TYPE_MUTLI_PICKLIST))
-					{
-						values.append("'").append(value).append("',").append("'").append(mvalueSB).append("'");
-					}
-					else
-					{
-						values.append("'").append(value).append("',").append("'").append(valueSB).append("'");
-					}
-				}
+                if (key.equals("allot_employee") || key.equals("allot_manager"))
+                {
+                    JSONArray valueArray = (JSONArray)value;
+                    valueSB.setLength(0);
+                    Iterator<Object> iterator = valueArray.iterator();
+                    
+                    while (iterator.hasNext())
+                    {
+                        if (valueSB.length() > 0)
+                        {
+                            valueSB.append(",");// 0部门 1成员 2角色 3 动态成员 4 公司
+                        }
+                        JSONObject item = (JSONObject)iterator.next();
+                        valueSB.append(item.get("type")).append("-").append(item.get("id"));
+                    }
+                    
+                    fileds.append(entry.getKey()).append(",").append(entry.getKey() + Constant.PICKUP_VALUE_FIELD_SUFFIX);
+                    values.append("'").append(value).append("',").append("'").append(valueSB).append("'");
+                    
+                }
+                else
+                {
+                    
+                    StringBuilder mvalueSB = new StringBuilder();
+                    JSONArray valueArray = (JSONArray)value;
+                    valueSB.setLength(0);
+                    Iterator<Object> iterator = valueArray.iterator();
+                    
+                    while (iterator.hasNext())
+                    {
+                        if (valueSB.length() > 0)
+                        {
+                            valueSB.append(",");
+                            mvalueSB.append("-");
+                        }
+                        JSONObject item = (JSONObject)iterator.next();
+                        valueSB.append(item.get("value"));
+                        mvalueSB.append(item.get("value"));
+                    }
+                    fileds.append(entry.getKey()).append(",").append(entry.getKey() + Constant.PICKUP_VALUE_FIELD_SUFFIX);
+                    if (key.startsWith(Constant.TYPE_MUTLI_PICKLIST))
+                    {
+                        values.append("'").append(value).append("',").append("'").append(mvalueSB).append("'");
+                    }
+                    else
+                    {
+                        values.append("'").append(value).append("',").append("'").append(valueSB).append("'");
+                    }
+                }
             }
             else
             {
@@ -149,7 +153,7 @@ public class SpecialJSONParser4SQL
             Entry<String, Object> entry = objs.next();
             String key = entry.getKey();
             Object value = entry.getValue();
-            
+            value = getValue(value, key);
             if (fileds.length() > 0)
             {
                 fileds.append(",");
@@ -212,6 +216,46 @@ public class SpecialJSONParser4SQL
         {
             return DAOUtil.getTableName(json.getString("bean"), companyId);
         }
+    }
+    
+    public static Object getValue(Object value, String key)
+    {
+        // 日期、省市区、定位转单行文本
+        if (value != null && key.startsWith("text"))
+        {
+            String str = value.toString();
+            boolean isNum = str.matches("[0-9]+");
+            if (isNum && str.length() == 10)
+            {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                value = sdf.format(value);
+            }
+            else if (value instanceof String && ((String)value).contains("0000"))
+            {
+                String newStr = str.substring(2, 6);
+                if ("0000".equals(newStr))
+                {
+                    String[] arr = str.split(",");
+                    String sb = "";
+                    for (int i = 0; i < arr.length; i++)
+                    {
+                        String s = arr[i];
+                        sb += s.substring(7);
+                    }
+                    value = sb;
+                }
+            }
+            else
+            {
+                if (value.toString().startsWith("{"))
+                {
+                    JSONObject jsonObject = JSONObject.parseObject(value.toString());
+                    value = jsonObject.get("value");
+                }
+            }
+        }
+        
+        return value;
     }
     
 }

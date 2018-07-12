@@ -6,20 +6,27 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 import com.alibaba.fastjson.JSON;
+import com.teamface.common.constant.RedisKey4Function;
 import com.teamface.common.util.StringUtil;
+import com.teamface.common.util.dao.JedisClusterHelper;
 import com.teamface.common.util.jwt.CheckResult;
 import com.teamface.common.util.jwt.Constant;
+import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
-
-import io.jsonwebtoken.Claims;
 
 @Component
 public class RequestInterceptor implements HandlerInterceptor
 {
+    
+    private static final Logger LOG = LogManager.getLogger(RequestInterceptor.class);
     
     @Override
     public void afterCompletion(HttpServletRequest arg0, HttpServletResponse arg1, Object arg2, Exception arg3)
@@ -51,15 +58,18 @@ public class RequestInterceptor implements HandlerInterceptor
             || requestUrl.contains("common/file/printTemplateDownload") || requestUrl.contains("fileLibrary/openUrlVailPwd") || requestUrl.contains("fileLibrary/queryOpenUrlEmail")
             || requestUrl.contains("/library/file/openDownload") || requestUrl.contains(".pdf") || requestUrl.contains("common/file/emailFileDownload")
             || requestUrl.contains("common/file/emailImageUpload") || requestUrl.contains("error/error") || requestUrl.contains("ueditor/exec")
-            || requestUrl.contains("applicationCenter/queryTemplateList") || requestUrl.contains("applicationCenter/queryApplicationLayoutById")|| requestUrl.contains("downloadThirdEmailFile"))
+            || requestUrl.contains("applicationCenter/queryTemplateList") || requestUrl.contains("applicationCenter/queryApplicationLayoutById")
+            || requestUrl.contains("downloadThirdEmailFile"))
         {
-            System.out.println("过滤登录请求");
+            LOG.error("过滤路径=======".concat(requestUrl));
             result = true;
         }
         else
         {
             String token = StringUtil.isEmpty(arg0.getHeader("TOKEN")) ? arg0.getParameter("TOKEN") : arg0.getHeader("TOKEN");
-            Map<String, Object> m = new HashMap<String, Object>();
+            String clientFlag = StringUtil.isEmpty(arg0.getHeader("CLIENT_FLAG")) ? arg0.getParameter("CLIENT_FLAG") : arg0.getHeader("CLIENT_FLAG");
+            Map<String, Object> m = new HashMap<>();
+            LOG.error("token验证======".concat(token));
             String errStr = signCheck(token);
             if ("".equals(errStr))
             {
@@ -67,10 +77,55 @@ public class RequestInterceptor implements HandlerInterceptor
             }
             else
             {
+                LOG.error(" token JWT 验证失败 ======".concat(token));
                 m.put("code", "1212");
                 m.put("msg", errStr);
                 String json = JSON.toJSONString(m);
                 writerJson(arg1, json);
+            }
+            
+            if (StringUtils.isNotEmpty(clientFlag) && Integer.parseInt(clientFlag) == 0)
+            {
+                LOG.error("pc端验证过期时间======".concat(token));
+                InfoVo info = TokenMgr.obtainInfo(token);
+                StringBuilder strKey = new StringBuilder();
+                strKey.append(info.getCompanyId());
+                strKey.append("_");
+                strKey.append(info.getEmployeeId());
+                strKey.append("_");
+                strKey.append(RedisKey4Function.USER_LOGIN_INFO.getIndex());
+                strKey.append("_");
+                strKey.append(clientFlag);
+                Object timeSign = JedisClusterHelper.get(strKey.toString());
+                if (null == timeSign)
+                {
+                    boolean falg = JedisClusterHelper.exists(strKey.toString());
+                    if (falg)
+                    {
+                        LOG.error(" token 过期 ======".concat(token));
+                        m.put("code", "1212");
+                        m.put("msg", "token过期");
+                        String json = JSON.toJSONString(m);
+                        writerJson(arg1, json);
+                    }
+                    else
+                    {
+                        result = true;
+                    }
+                }
+                else
+                {
+                    int time = Integer.parseInt(timeSign.toString());
+                    if (time > 0)
+                    {
+                        LOG.error("延续过期时间 ======".concat(token));
+                        JedisClusterHelper.set(strKey.toString(), timeSign, time);
+                    }
+                    else
+                    {
+                        result = true;
+                    }
+                }
             }
         }
         return result;

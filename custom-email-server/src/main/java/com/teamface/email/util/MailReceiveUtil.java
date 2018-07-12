@@ -53,7 +53,7 @@ public class MailReceiveUtil
 {
     private static final Logger log = LogManager.getLogger(MailReceiveUtil.class);
     
-    private String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
+    private static final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
     
     private MimeMessage mimeMessage = null;
     
@@ -120,11 +120,13 @@ public class MailReceiveUtil
         InternetAddress[] address = (InternetAddress[])mimeMessage.getFrom();
         String from = address[0].getAddress();
         AccountName accountName = new AccountName();
-        if (from == null)
+        if (from == null) {
             from = "";
+        }
         String personal = address[0].getPersonal();
-        if (personal == null)
+        if (personal == null) {
             personal = "";
+        }
         accountName.setEmployee_name(personal);
         accountName.setMail_account(from);
         return accountName;
@@ -138,8 +140,9 @@ public class MailReceiveUtil
     {
         InternetAddress[] address = (InternetAddress[])mimeMessage.getFrom();
         String from = address[0].getAddress();
-        if (from == null)
+        if (from == null) {
             from = "";
+        }
         return from == null ? "" : from;
     }
     
@@ -165,7 +168,8 @@ public class MailReceiveUtil
             log.error(e.getMessage(), e);
             return r;
         }
-        Pattern datapattern = Pattern.compile(".+\\[(.+)\\].+", Pattern.CASE_INSENSITIVE);
+        String re = ".+\\[(.+)\\].+";
+        Pattern datapattern = Pattern.compile(re, Pattern.CASE_INSENSITIVE);
         Matcher tagMatcher = datapattern.matcher(r);
         if (tagMatcher.find())
         {
@@ -193,13 +197,13 @@ public class MailReceiveUtil
         InternetAddress[] address = null;
         List<AccountName> list = new ArrayList<>();
         AccountName accountName = null;
-        if (addtype.equals("TO") || addtype.equals("CC") || addtype.equals("BCC"))
+        if ("TO".equals(addtype) || "CC".equals(addtype) || "BCC".equals(addtype))
         {
-            if (addtype.equals("TO"))
+            if ("TO".equals(addtype))
             {
                 address = (InternetAddress[])mimeMessage.getRecipients(Message.RecipientType.TO);
             }
-            else if (addtype.equals("CC"))
+            else if ("CC".equals(addtype))
             {
                 address = (InternetAddress[])mimeMessage.getRecipients(Message.RecipientType.CC);
             }
@@ -298,8 +302,9 @@ public class MailReceiveUtil
         String contenttype = part.getContentType();
         int nameindex = contenttype.indexOf("name");
         boolean conname = false;
-        if (nameindex != -1)
+        if (nameindex != -1) {
             conname = true;
+        }
         if (part.isMimeType("text/plain") && !conname)
         {
             bodyPlainText.append((String)part.getContent());
@@ -351,8 +356,9 @@ public class MailReceiveUtil
         {
             for (String string : needreply)
             {
-                if (string.equals("1"))
+                if ("1".equals(string)) {
                     return true;
+                }
             }
         }
         return replysign;
@@ -401,8 +407,9 @@ public class MailReceiveUtil
             {
                 BodyPart mpart = mp.getBodyPart(i);
                 String disposition = mpart.getDisposition();
-                if ((disposition != null) && ((disposition.equals(Part.ATTACHMENT)) || (disposition.equals(Part.INLINE))))
+                if ((disposition != null) && ((disposition.equals(Part.ATTACHMENT)) || (disposition.equals(Part.INLINE)))) {
                     attachflag = true;
+                }
                 else if (mpart.isMimeType("multipart/*"))
                 {
                     attachflag = isContainAttach((Part)mpart);
@@ -410,10 +417,12 @@ public class MailReceiveUtil
                 else
                 {
                     String contype = mpart.getContentType();
-                    if (contype.toLowerCase().indexOf("application") != -1)
+                    if (contype.toLowerCase().indexOf("application") != -1) {
                         attachflag = true;
-                    if (contype.toLowerCase().indexOf("name") != -1)
+                    }
+                    if (contype.toLowerCase().indexOf("name") != -1) {
                         attachflag = true;
+                    }
                 }
             }
         }
@@ -441,16 +450,16 @@ public class MailReceiveUtil
             String fileType = "";
             Attachment attachment;
             Multipart mp = (Multipart)part.getContent();
-            boolean inlineFlag = false;
+            
             for (int i = 0; i < mp.getCount(); i++)
             {
                 fileUrl = new StringBuilder();
                 attachment = new Attachment();
                 BodyPart mpart = mp.getBodyPart(i);
                 String disposition = mpart.getDisposition();
+                boolean inlineFlag = false;
                 if ((disposition != null) && ((disposition.equals(Part.ATTACHMENT)) || (disposition.equals(Part.INLINE))))
                 {
-                    
                     fileName = mpart.getFileName();
                     if (fileName != null)
                     {
@@ -468,8 +477,7 @@ public class MailReceiveUtil
                             .append(fileName)
                             .append("&fileSize=")
                             .append(fileSize);
-                        InputStream ips = mpart.getInputStream();
-                        saveFile(fileName, ips);
+                        saveFile(fileName, mpart.getInputStream());
                     }
                     
                 }
@@ -489,8 +497,7 @@ public class MailReceiveUtil
                             .append(fileName)
                             .append("&fileSize=")
                             .append(fileSize);
-                        InputStream ips = mpart.getInputStream();
-                        saveFile(fileName, ips);
+                        saveFile(fileName, mpart.getInputStream());
                     }
                 }
                 else if (mpart.isMimeType("multipart/alternative"))
@@ -509,8 +516,7 @@ public class MailReceiveUtil
                             .append(fileName)
                             .append("&fileSize=")
                             .append(fileSize);
-                        InputStream ips = mpart.getInputStream();
-                        saveFile(fileName, ips);
+                        saveFile(fileName, mpart.getInputStream());
                     }
                 }
                 else
@@ -533,8 +539,7 @@ public class MailReceiveUtil
                             .append(fileSize);
                         fileUrl.append("&companyId=").append(companyId);
                         fileUrl.append("&employeeId=").append(employeeId);
-                        InputStream ips = mpart.getInputStream();
-                        saveFile(fileName, ips);
+                        saveFile(fileName, mpart.getInputStream());
                     }
                 }
                 if (null != fileName && !StringUtils.isEmpty(fileUrl.toString()))
@@ -566,13 +571,15 @@ public class MailReceiveUtil
         String osName = System.getProperty("os.name");
         String storedir = "";
         String separator = "";
-        if (osName == null)
+        if (osName == null) {
             osName = "";
+        }
         if (osName.toLowerCase().indexOf("win") != -1)
         {
             separator = "/";
-            if (storedir == null || storedir.equals(""))
+            if (storedir == null || storedir.equals("")) {
                 storedir = fileDir;
+            }
         }
         else
         {
@@ -594,15 +601,15 @@ public class MailReceiveUtil
             bos = new BufferedOutputStream(new FileOutputStream(filePath.toString()));
             bis = new BufferedInputStream(in);
             int c;
-            while ((c = bis.read()) != -1)
+            byte[] buffer = new byte[1024 * 1024];
+            while ((c = bis.read(buffer)) != -1)
             {
-                bos.write(c);
-                bos.flush();
+                bos.write(buffer, 0, c);
             }
         }
-        catch (Exception exception)
+        catch (Exception e)
         {
-            exception.printStackTrace();
+            log.error(e.getMessage(), e);
             throw new Exception("文件保存失败!");
         }
         finally
@@ -792,16 +799,16 @@ public class MailReceiveUtil
         }
         Calendar cal = Calendar.getInstance();
         cal.setTime(new Date());
-        int month = cal.get(cal.MONTH);
-        int year = cal.get(cal.YEAR);
+        int month = cal.get(Calendar.MONTH);
+        int year = cal.get(Calendar.YEAR);
         if (month > interval - MailConstant.MONTH_YEAR_DIFFERENCE)
         {
-            cal.set(cal.MONTH, month - interval);
+            cal.set(Calendar.MONTH, month - interval);
         }
         else
         {
-            cal.set(cal.MONTH, month + MailConstant.MONTH_OF_YEAR - interval);
-            cal.set(cal.YEAR, year - MailConstant.MONTH_YEAR_DIFFERENCE);
+            cal.set(Calendar.MONTH, month + MailConstant.MONTH_OF_YEAR - interval);
+            cal.set(Calendar.YEAR, year - MailConstant.MONTH_YEAR_DIFFERENCE);
         }
         return cal.getTimeInMillis();
     }

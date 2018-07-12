@@ -132,7 +132,7 @@ public interface ModuleAppService
      * @return
      * @Description:获取初始化条件数据
      */
-    public JSONArray queryInitData(String token, String bean)
+    public JSONArray queryInitData(String token, String bean, String dynamicFlag)
         throws Exception;
         
     /**

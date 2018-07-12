@@ -71,4 +71,13 @@ public interface CenterUserAppService
      */
     List<JSONObject> queryUserList();
     
+    /**
+     * 启动账户
+     * @param layoutJson
+     * @param token
+     * @return
+     * @Description:
+     */
+    ServiceResult<String> enableCenterUser(JSONObject layoutJson, String token);
+    
 }

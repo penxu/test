@@ -81,7 +81,7 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
                 data.put("latitude", "");
             else
                 data.put("latitude", imCircleMain.getLatitude());
-                
+            
             data.put("info", contentInfo);
             data.put("datetime_create_date", imCircleMain.getCreateDate());
             data.put("is_delete", '0');
@@ -117,9 +117,8 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
                     
                 }
                 // 插入头像数据
-                StringBuilder insertPhotoSB = new StringBuilder().append("insert into im_circle_photo_")
-                    .append(companyId)
-                    .append(" (circle_main_id, file_url, datetime_upload_time,file_name,file_size,file_type) values(?, ?, ?, ?, ?, ?)");
+                StringBuilder insertPhotoSB = new StringBuilder().append("insert into im_circle_photo_").append(companyId).append(
+                    " (circle_main_id, file_url, datetime_upload_time,file_name,file_size,file_type) values(?, ?, ?, ?, ?, ?)");
                 int res = DAOUtil.executeBatchUpdate(insertPhotoSB.toString(), objList);
                 if (res <= 0)
                 {
@@ -133,7 +132,7 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
             String pushContent = alertTemplate(employeeName, content);
             // 获取当前公司的助手企信小助手的ID
             StringBuilder queryAssistantSqlSB = new StringBuilder().append("select id from im_assistant where company_id = ").append(companyId).append(" and type = 2");
-            JSONObject assistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());
+            JSONObject assistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());   //消息提醒
             Long assistantId = 0l;
             JSONObject pushContentObj = new JSONObject();
             pushContentObj.put("type", Constant.PUSH_MESSAGE_CIRCLE);
@@ -398,7 +397,7 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
             "SELECT icm.ID,icm.from_id,icm.address,icm.longitude,icm.latitude,icm.info,icm.datetime_create_date,icm.is_delete,e.employee_name as \"employeeName\",e.id as \"employeeId\",e.picture as photograph FROM ");
         countSqlSB.append(applicationTable);
         querySqlSB.append(applicationTable).append(" icm left join employee_").append(companyId).append(" e on icm.from_id = e.id");
-        if (isPerson != null)
+        if (isPerson != null) // 是否查询个人同事圈信息
         {
             countSqlSB.append(" where from_id = ");
             countSqlSB.append(isPerson);
@@ -429,6 +428,9 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
         return pageVo;
     }
     
+    /**
+     * 人员同事圈最近4张发送图片
+     */
     @Override
     public List<Map<String, Object>> findLastPhoto(String token, Map<String, Object> paramMap)
     {
@@ -447,6 +449,9 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
         return circlePhotos;
     }
     
+    /**
+     * 查询用户发布信息图片
+     */
     @Override
     public List<Map<String, Object>> findVoListPhoto(String token, Map<String, Object> paramMap)
     {
@@ -457,10 +462,13 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
             .append(companyId)
             .append(" a WHERE a.circle_main_id=")
             .append(paramMap.get("circleMainId"));
-        circleMap = DAOUtil.executeQuery(querySqlSB.toString());
+        circleMap = DAOUtil.executeQuery(querySqlSB.toString());  //人员图片信息
         return circleMap;
     }
     
+    /**
+     * 查询用户评论列表
+     */
     @Override
     public List<ImCircleComment> findVoListComment(String token, Map<String, Object> paramMap)
     {
@@ -485,6 +493,9 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
         return imCircleComments;
     }
     
+    /**
+     * 查询用户点赞列表
+     */
     @Override
     public List<ImCircleUp> findVoListUp(String token, Map<String, Object> paramMap)
     {
@@ -566,15 +577,16 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
     
     private String queryEmployeeNameBySignId(Long signId, Long companyId)
     {
-        StringBuilder queryEmployeeNameSqlSB = new StringBuilder().append("select e.employee_name from employee_")
-            .append(companyId)
-            .append(" e join (select * from acountinfo a where a.id = ")
-            .append(signId)
-            .append(") ac on ac.employee_id = e.id ");
+        StringBuilder queryEmployeeNameSqlSB =
+            new StringBuilder().append("select e.employee_name from employee_").append(companyId).append(" e join (select * from acountinfo a where a.id = ").append(signId).append(
+                ") ac on ac.employee_id = e.id ");
         JSONObject empObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeNameSqlSB.toString());
         return empObj.getString("employee_name");
     }
     
+    /**
+     * 获取同事圈发布信息列表
+     */
     @Override
     public PageVo<Map<String, Object>> getAllInfo(String token, Long isPerson, Long startTime, Long endTime, Integer pageNo, Integer pageSize)
     {
@@ -607,6 +619,7 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
                         temp.add(circlePhotos.get(i));
                     }
                 }
+                //查看图片
                 vo.put("images", temp);
                 temp = new ArrayList<>();
                 for (int i = 0; i < comments.size(); i++)
@@ -657,15 +670,15 @@ public class ImCircleAppServiceImpl implements ImCircleAppService
     public List<Map<String, Object>> findListUp(Long companyId, String circleMainIds)
     {
         List<Map<String, Object>> imCircleUpMaps = new ArrayList<>();
-        StringBuilder querySqlSB = new StringBuilder()
-            .append(
-                "SELECT icu.circle_main_id as \"circleMainId\",icu.employee_id as \"employeeId\",e.employee_name as \"employeeName\",e.picture as \"photograph\" from im_circle_up_")
+        StringBuilder querySqlSB = new StringBuilder().append(
+            "SELECT icu.circle_main_id as \"circleMainId\",icu.employee_id as \"employeeId\",e.employee_name as \"employeeName\",e.picture as \"photograph\" from im_circle_up_")
             .append(companyId);
         querySqlSB.append(" icu left join employee_").append(companyId).append(" e on icu.employee_id = e.id");
         querySqlSB.append(" where icu.circle_main_id in (").append(circleMainIds).append(")");
         imCircleUpMaps = DAOUtil.executeQuery(querySqlSB.toString());
         return imCircleUpMaps;
     }
+    
     
     public List<Map<String, Object>> findListPhoto(String token, String circleMainIds)
     {

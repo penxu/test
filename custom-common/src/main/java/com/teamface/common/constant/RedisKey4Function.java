@@ -34,14 +34,16 @@ public enum RedisKey4Function
     PROCESS_NAME("流程名称", 9),
     /* key格式：公司标识_流程实例_节点key_功能标识（例：1_2402_task151_9） */
     PROCESS_APPROVAL_USERS("已审批人ID集", 10),
-    /* key格式： (例 x_time1_11)*/ 
+    /* key格式： (例 x_time1_11) */
     USER_LOGIN_INFO("登录用户相关信息", 11),
     /* key格式： */
     REPORT_DATALIST_FILTER_FIELDS("报表数据列表筛选字段", 12),
     /* key格式：x_cjob_13_className_mothodName_timer */
     JOB_TRIGGER_REQUEST_PARAM("触发任务请求参数", 13),
     /* key格式：公司标识_流程实例_功能标识（例：1_2402_14） */
-    PROCESS_AGREE_USERS("流程审批通过人员集合", 14);
+    PROCESS_AGREE_USERS("流程审批通过人员集合", 14),
+    /* key格式：公司标识_流程key_节点key_功能标识（例：1_process1528280550141_task15123156_14） */
+    PROCESS_END_DEP("终止部门", 15);
     
     // 注释
     private String name;

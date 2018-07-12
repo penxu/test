@@ -54,7 +54,7 @@ public class EmailSenderJob implements Job
         }
         // 发送成功记录发件信息
         StringBuilder updateBoxSqlSB = new StringBuilder().append("update ").append(boxTable);
-        updateBoxSqlSB.append(" set mail_box_id = 2,read_status = 1 ").append(" where id = ").append(mailId);
+        updateBoxSqlSB.append(" set mail_box_id = 2,read_status = 1,timer_status = 0 where id =").append(mailId);
         DAOUtil.executeUpdate(updateBoxSqlSB.toString());
     }
     

@@ -18,6 +18,7 @@ import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,12 +27,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.constant.Constant;
 import com.teamface.common.constant.DataTypes;
+import com.teamface.common.util.JsonResUtil;
 import com.teamface.common.util.PropertiesConfigObject;
 import com.teamface.common.util.StringUtil;
 import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.common.util.dao.OSSUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
+import com.teamface.custom.service.library.FileLibraryAppService;
 
 /**
  * 
@@ -53,6 +56,9 @@ public class LibDownloadController
     private OutputStream os = null;
     
     private String fileDir;
+    
+    @Autowired
+    FileLibraryAppService fileLibraryAppService;
     
     private ByteArrayOutputStream outputStream = null;
     
@@ -152,10 +158,10 @@ public class LibDownloadController
         try
         {
             response.setCharacterEncoding("UTF-8");
-            response.setHeader("content-disposition", "attachment;filename=" + URLEncoder.encode(fileName, "utf-8"));
             is = new FileInputStream(
                 new File(new StringBuilder().append(fileDir).append("//").append(companyId).append("//").append(employeeId).append("//").append(fileName).toString()));
             response.setContentLength(is.available());
+            response.setHeader("content-disposition", "attachment;filename=" + URLEncoder.encode(fileName, "utf-8"));
             fos = new BufferedInputStream(is);
             os = response.getOutputStream();
             int count;
@@ -188,7 +194,7 @@ public class LibDownloadController
      */
     @RequestMapping(value = "/email/file/downloadThirdEmailFile", method = RequestMethod.GET)
     public void downloadEmailFile(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) String fileName,
-        @RequestParam(required = true) String fileSize,@RequestParam(required = true) Long companyId,@RequestParam(required = true) String employeeId)
+        @RequestParam(required = true) String fileSize, @RequestParam(required = true) Long companyId, @RequestParam(required = true) String employeeId)
     {
         try
         {
@@ -216,6 +222,7 @@ public class LibDownloadController
             closeConnection();
         }
     }
+    
     /**
      * 
      * @param request 请求信息
@@ -226,13 +233,13 @@ public class LibDownloadController
      * @Description:下载文件不记录下载次数
      */
     @RequestMapping(value = "/library/file/downloadWithoutRecord", method = RequestMethod.GET)
-    public void downloadWithoutRecord(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
+    public JSONObject downloadWithoutRecord(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
         @RequestParam(required = false) Integer type, @RequestParam(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenPara,
         @RequestHeader(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenHeader)
     {
         if (StringUtil.isEmpty(tokenPara) && StringUtil.isEmpty(tokenHeader))
         {
-            return;
+            return JsonResUtil.getFailJsonObject();
         }
         String token = StringUtil.isEmpty(tokenPara) ? tokenHeader : tokenPara;
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -243,7 +250,7 @@ public class LibDownloadController
             JSONObject fileJson = DAOUtil.executeQuery4FirstJSON(queryFileSql);
             if (null == fileJson)
             {
-                return;
+                return JsonResUtil.getFailJsonObject();
             }
             String fileUrl = fileJson.getString("url");
             String fileName = fileJson.getString("name");
@@ -269,6 +276,7 @@ public class LibDownloadController
         {
             closeConnection();
         }
+        return JsonResUtil.getSuccessJsonObject();
     }
     
     /**

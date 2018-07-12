@@ -166,9 +166,7 @@ public class CenterUserAppServiceImpl implements CenterUserAppService
             String userName = (String)map.get("userName");
             String password = (String)map.get("passWord");
             StringBuilder builder = new StringBuilder("SELECT * FROM  center_account where phone = '").append(userName)
-                .append("' and  status =")
-                .append(Constant.CURRENCY_ZERO)
-                .append(" and del_status=")
+                .append("' and del_status=")
                 .append(Constant.CURRENCY_ZERO);
             LOG.info("查询账户+++++++++++++++++++++++++++++");
             JSONObject data = DAOUtil.executeQuery4FirstJSON(builder.toString());
@@ -176,6 +174,9 @@ public class CenterUserAppServiceImpl implements CenterUserAppService
             if (null == data)
             {
                 return JsonResUtil.getResultJsonByIdent("postprocess.userName.error");
+            }
+            if(data.getInteger("status") == Constant.CURRENCY_ONE) {
+                return JsonResUtil.getResultJsonByIdent("common.center_account.error");
             }
             JedisClusterHelper.set(DataTypes.REQUEST_HEADER_USERID, data.get("id"));
             
@@ -353,6 +354,50 @@ public class CenterUserAppServiceImpl implements CenterUserAppService
             LOG.error(e.getMessage(), e);
         }
         return result;
+    }
+    
+    /**
+     * 启用账户
+     */
+    @Override
+    public ServiceResult<String> enableCenterUser(JSONObject layoutJson, String token)
+    {
+        ServiceResult<String> serviceResult = new ServiceResult<>();
+        try
+        {
+            InfoVo info = TokenMgr.obtainInfo(token);
+            int number = centerRoleAppService.userRoleAuth(info.getSignId(), Constant.AUTH_TWENTY_SIX); // 验证权限
+            if (number <= 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("postprocess.user.auth.error"), resultCode.getMsgZh("postprocess.user.auth.error"));
+                return serviceResult;
+            }
+            StringBuilder editBilder = new StringBuilder();
+            editBilder.append(" update center_account set status = ");
+            editBilder.append(Constant.CURRENCY_ZERO);
+            editBilder.append(" where     id  in ( ");
+            editBilder.append(layoutJson.get("id"));
+            editBilder.append(" ) ");
+            int count = DAOUtil.executeUpdate(editBilder.toString());
+            if (count <= 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
+            Map<String, String> resultMap = new HashMap<>();
+            resultMap.put("datetime_time", System.currentTimeMillis() + "");
+            resultMap.put("token", token);
+            resultMap.put("content", "删除用户");
+            centerAppService.savaLogRecord(resultMap);
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+            return serviceResult;
+        }
+        serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
+        return serviceResult;
     }
     
 }

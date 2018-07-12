@@ -3,6 +3,8 @@ package com.teamface.custom.service.module;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.bson.Document;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,8 @@ import com.teamface.common.util.jwt.TokenMgr;
 public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
 {
     private static ServiceResultCodeCache resultCode = ServiceResultCodeCache.getInstance();
+    
+    private static final Logger LOG = LogManager.getLogger(FieldRelyonAppServiceImpl.class);
     
     /**
      * @param token
@@ -54,6 +58,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -86,6 +91,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -106,7 +112,8 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         {
             JSONObject reqJson = JSONObject.parseObject(reqJsonStr);
             String layoutId = reqJson.getString("id");
-            if(StringUtil.isEmpty(layoutId)){
+            if (StringUtil.isEmpty(layoutId))
+            {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
@@ -118,6 +125,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -144,6 +152,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return new ArrayList<JSONObject>();
@@ -177,6 +186,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -209,6 +219,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -229,7 +240,8 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         {
             JSONObject reqJson = JSONObject.parseObject(reqJsonStr);
             String layoutId = reqJson.getString("id");
-            if(StringUtil.isEmpty(layoutId)){
+            if (StringUtil.isEmpty(layoutId))
+            {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
@@ -241,6 +253,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -267,6 +280,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return new ArrayList<JSONObject>();
@@ -300,6 +314,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -332,6 +347,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -352,7 +368,8 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         {
             JSONObject reqJson = JSONObject.parseObject(reqJsonStr);
             String layoutId = reqJson.getString("id");
-            if(StringUtil.isEmpty(layoutId)){
+            if (StringUtil.isEmpty(layoutId))
+            {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
@@ -364,6 +381,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -388,7 +406,8 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
             queryDoc.put("companyId", companyId.toString());
             queryDoc.put("bean", bean);
             List<JSONObject> resultList = LayoutUtil.findModuleSetLayout(queryDoc, Constant.PICKUPLIST_RELYON_COLLECTION);
-            if(!resultList.isEmpty()){
+            if (!resultList.isEmpty())
+            {
                 for (JSONObject tmpJson : resultList)
                 {
                     result.add(tmpJson);
@@ -397,6 +416,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return result;
@@ -430,6 +450,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -462,6 +483,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -482,7 +504,8 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         {
             JSONObject reqJson = JSONObject.parseObject(reqJsonStr);
             String layoutId = reqJson.getString("id");
-            if(StringUtil.isEmpty(layoutId)){
+            if (StringUtil.isEmpty(layoutId))
+            {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
@@ -494,6 +517,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return serviceResult;
@@ -520,6 +544,7 @@ public class FieldRelyonAppServiceImpl implements FieldRelyonAppService
         }
         catch (Exception e)
         {
+            LOG.error(e.getMessage(), e);
             e.printStackTrace();
         }
         return new ArrayList<JSONObject>();

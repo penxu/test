@@ -549,7 +549,12 @@ public class ActivitiUtil
                     taskService.setVariable(taskId, "firstTaskId", taskId);
                     taskService.setVariable(taskId, "currentTaskId", taskId);
                     taskService.setVariable(taskId, "currentTaskKey", taskKey);
-                    completeTask(companyId, processInstanceId, taskId, taskKey, event, message, employeeId, nextAssignee, TASK_CATEGORY_SUBMIT);
+                    AutoTask autoComplete = completeTask(companyId, processInstanceId, taskId, taskKey, event, message, employeeId, nextAssignee, TASK_CATEGORY_SUBMIT);
+                    if (!StringUtil.isEmpty(autoComplete.taskDefinitionKey) && autoComplete.taskDefinitionKey.equals("noOutgoing"))
+                    {
+                        resultMap.put("noOutgoing", "1");
+                        return resultMap;
+                    }
                 }
                 resultMap.put("processInstanceId", processInstanceId);
                 resultMap.put("processDefinitionId", processDefinitionId);
@@ -884,7 +889,17 @@ public class ActivitiUtil
                 long nextNextAssignee = nextAssignee;
                 boolean distinctFlag = false;
                 Object distinctType = taskService.getVariable(taskId, VAR_DISTINCTTYPE);
-                taskService.complete(taskId);
+                try
+                {
+                    taskService.complete(taskId);
+                }
+                catch (Exception e)
+                {
+                    if (e.getMessage().startsWith("No outgoing sequence flow of the exclusive gateway "))
+                    {
+                        return new AutoTask(null, "noOutgoing", null, 0, 0, false);
+                    }
+                }
                 String redisKey = companyId + "_" + processInstanceId + "_" + RedisKey4Function.PROCESS_AGREE_USERS.getIndex();
                 JedisClusterHelper.sadd(redisKey, theCategory + employeeId);
                 // 判断是否要处理下一节点

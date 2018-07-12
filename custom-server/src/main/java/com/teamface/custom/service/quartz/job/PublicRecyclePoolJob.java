@@ -83,7 +83,6 @@ public class PublicRecyclePoolJob implements Job {
 		// 规则分配数据颜色
 		String colourName = DAOUtil.getTableName("module_colour_center", companyId);
 		List<List<Object>> batchValue = new ArrayList<>();
-		List<List<Object>> batchValues = new ArrayList<>();
 		for (int i = 0; i < jsonList.size(); i++) {
 			String sql = "select count(*) from " + colourName + " where bean='" + data.getString("bean")
 					+ "' and data_id=" + jsonList.get(i).getLong("id");
@@ -95,12 +94,6 @@ public class PublicRecyclePoolJob implements Job {
 				model.add(data.getString("colour")); // 颜色
 				model.add(jsonList.get(i).getLongValue("id")); // 数据id
 				batchValue.add(model);
-			}else {
-				List<Object> model = new ArrayList<>();
-				model.add(data.getString("colour")); // 颜色
-				model.add(data.getString("bean"));// bean
-				model.add(jsonList.get(i).getLongValue("id")); // 数据id
-				batchValues.add(model);
 			}
 
 		}
@@ -110,11 +103,6 @@ public class PublicRecyclePoolJob implements Job {
 			insertSql.append(colourName);
 			insertSql.append(" (rule_colour_id,bean,colour,data_id) values(?,?,?,?)");
 			DAOUtil.executeUpdate(insertSql.toString(), batchValue, 1000);
-		}
-		if (!batchValues.isEmpty()) {
-			StringBuilder editBuilder = new StringBuilder();
-			editBuilder.append("update  ").append(colourName).append(" set colour = ?  where bean=?  and data_id = ?");
-			DAOUtil.executeUpdate(editBuilder.toString(), batchValues, 1000);
 		}
 
 	}

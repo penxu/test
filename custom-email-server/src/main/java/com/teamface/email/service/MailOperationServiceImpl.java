@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -120,7 +121,7 @@ public class MailOperationServiceImpl implements MailOperationService
         Set<JSONObject> jsonSet = getRecipentInfo(mailBody);
         mailLatestAccount.batchInsert(token, jsonSet);
         boolean timerStatus = false;
-        if (timerTime != null && timerTime != 0l)
+        if (timerTime != null && timerTime != 0L)
         {
             timerStatus = true;
         }
@@ -169,7 +170,7 @@ public class MailOperationServiceImpl implements MailOperationService
         insertData.add(mailBody.getJSONArray("to_recipients").toString());
         insertData.add(null == mailBody.get("is_emergent") ? 0 : mailBody.get("is_emergent"));
         insertData.add(mailBody.getJSONArray("cc_recipients").toString());
-        insertData.add(mailBody.get("signature_id"));
+        insertData.add(Objects.isNull(mailBody.getLong("signature_id")) ? null : mailBody.get("signature_id"));
         insertData.add(mailBody.get("account_id"));
         insertData.add(mailBody.get("from_recipient_name"));
         insertData.add(null == mailBody.get("single_show") ? 0 : mailBody.get("single_show"));
@@ -212,7 +213,7 @@ public class MailOperationServiceImpl implements MailOperationService
             // 流程参数
             Map<String, Object> processVars = new HashMap<>();
             processVars.put(ActivitiUtil.VAR_DATA_ID, dataId);
-            if (!StringUtil.isEmpty(nextApproverBy))        
+            if (!StringUtil.isEmpty(nextApproverBy))
             {// 自由流程设置审批人
                 processVars.put("nextAssignee", nextApproverBy);
             }
@@ -394,10 +395,14 @@ public class MailOperationServiceImpl implements MailOperationService
             .append(employeeId);
         querySQLSB.append(" GROUP BY mts.mail_belong_id ) tag on tag.mail_belong_id = mbs.id where mbs.employee_id = ").append(employeeId);
         if (boxId == 6)
+        {
             querySQLSB.append(" and mbs.read_status = 0 and mbs.mail_box_id = 1");
+        }
         else
+        {
             querySQLSB.append(" and mbs.mail_box_id = ").append(boxId);
-        querySQLSB.append(" and mbs.del_status = 0").append(" order by mbs.id desc");
+        }
+        querySQLSB.append(" and mbs.del_status = 0").append(" order by mbs.create_time desc");
         List<String> list = new ArrayList<>();
         list.add("to_recipients");
         list.add("cc_recipients");
@@ -561,7 +566,7 @@ public class MailOperationServiceImpl implements MailOperationService
                                 // 2 判断是否需要移动
                                 JSONObject transferObj = json.getJSONObject("transfer_to");
                                 String isTransfer = transferObj.getString("transfer_conditon");
-                                if (isTransfer.equals("1"))
+                                if ("1".equals(isTransfer))
                                 {
                                     Long tagId = transferObj.getLongValue("transfer_target");
                                     JSONObject obj = new JSONObject();
@@ -606,7 +611,7 @@ public class MailOperationServiceImpl implements MailOperationService
             mailBoxTableName = DAOUtil.getTableName(mailBoxScopeApproval, companyId);
             mailBodyTableName = DAOUtil.getTableName(mailBodyTableApproval, companyId);
             querySQLSB = new StringBuilder().append(
-                "select mb.account_id,mb.mail_content,mb.from_recipient,mb.subject,mb.bcc_recipients,mb.mail_source,mb.embedded_images,mb.is_track,mb.bcc_setting,mb.attachments_name,mb.to_recipients,mb.cc_recipients,mb.is_emergent,mb.is_plain,mb.is_notification,mb.send_status,mb.timer_task_time,mb.single_show,mb.ip_address,");
+                "select mb.account_id,mb.mail_content,mb.from_recipient,mb.subject,mb.bcc_recipients,mb.mail_source,mb.embedded_images,mb.is_track,mb.bcc_setting,mb.attachments_name,mb.to_recipients,mb.cc_recipients,mb.is_emergent,mb.is_plain,mb.is_notification,mb.is_signature,mb.send_status,mb.timer_task_time,mb.single_show,mb.ip_address,");
             querySQLSB.append(" mbs.id,mbs.mail_box_id,mbs.approval_status,mbs.read_status,mbs.timer_status,mbs.create_time,mbs.draft_status,mbs.process_instance_id from ");
             querySQLSB.append(mailBoxTableName).append(" mbs join (select * from ").append(mailBodyTableName).append(") mb on mbs.mail_id = mb.id ");
             querySQLSB.append(" where mbs.id = ").append(id).append(" and mbs.del_status = 0");
@@ -616,7 +621,7 @@ public class MailOperationServiceImpl implements MailOperationService
             mailBoxTableName = DAOUtil.getTableName(mailBoxScope, companyId);
             mailBodyTableName = DAOUtil.getTableName(mailBodyTable, companyId);
             querySQLSB = new StringBuilder().append(
-                "select mb.account_id,mb.mail_content,mb.from_recipient,mb.subject,mb.bcc_recipients,mb.mail_source,mb.embedded_images,mb.is_track,mb.bcc_setting,mb.attachments_name,mb.to_recipients,mb.cc_recipients,mb.is_emergent,mb.is_plain,mb.is_notification,mb.send_status,mb.timer_task_time,mb.single_show,mb.ip_address,");
+                "select mb.account_id,mb.mail_content,mb.from_recipient,mb.subject,mb.bcc_recipients,mb.mail_source,mb.embedded_images,mb.is_track,mb.bcc_setting,mb.attachments_name,mb.to_recipients,mb.cc_recipients,mb.is_emergent,mb.is_plain,mb.is_notification,mb.is_signature,mb.send_status,mb.timer_task_time,mb.single_show,mb.ip_address,");
             querySQLSB.append(
                 " mbs.id,mbs.mail_box_id,mbs.approval_status,mbs.read_status,mbs.timer_status,mbs.process_instance_id,mbs.create_time,mbs.draft_status,tag.mail_tags from ");
             querySQLSB.append(mailBoxTableName).append(" mbs join (select * from ").append(mailBodyTableName).append(") mb on mbs.mail_id = mb.id ");
@@ -777,7 +782,7 @@ public class MailOperationServiceImpl implements MailOperationService
         Long timerTime = mailBody.getLong("timer_task_time");
         boolean timerStatus = false;
         int approvalIntegerStatus = Integer.valueOf(approvalStatus.trim());
-        if (timerTime != null && timerTime != 0l)
+        if (timerTime != null && timerTime != 0L)
         {
             timerStatus = true;
         }
@@ -896,12 +901,19 @@ public class MailOperationServiceImpl implements MailOperationService
         ServiceResult<String> serviceResult = new ServiceResult<>();
         JSONObject mailReleventInfo = JSONObject.parseObject(jsonStr);
         String mailId = mailReleventInfo.getString("mailId");
+        if (StringUtils.isEmpty(mailId))
+        {
+            serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
+            return serviceResult;
+        }
+        Long employeeId = info.getEmployeeId();
         Long boxId = mailReleventInfo.getLongValue("boxId");
         String mailBoxTableName = DAOUtil.getTableName(mailBoxScope, companyId);
+        String mailBodyTableName = DAOUtil.getTableName(mailBodyTable, companyId);
         // 修改邮箱的类型
         StringBuilder updateSqlSB = new StringBuilder().append("update ").append(mailBoxTableName);
         updateSqlSB.append(" set mail_box_id = ").append(boxId);
-        if (boxId == 3)
+        if (boxId == MailConstant.MAIL_BOX_DRAFT)
         {
             updateSqlSB.append(",approval_status = '10'");
         }
@@ -912,6 +924,44 @@ public class MailOperationServiceImpl implements MailOperationService
             serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
             return serviceResult;
         }
+        // 启用修改移动到草稿箱邮件的定时任务
+        if (boxId == MailConstant.MAIL_BOX_DRAFT)
+        {
+            StringBuilder queryTimerSQLSB = new StringBuilder().append("select mbs.id,mb.timer_task_time from ").append(mailBoxTableName);
+            queryTimerSQLSB.append(" mbs join ").append(mailBodyTableName).append(" mb on mbs.mail_id = mb.id where mbs.id in (").append(mailId).append(")");
+            List<JSONObject> timerList = DAOUtil.executeQuery4JSON(queryTimerSQLSB.toString());
+            if (!Collections.isEmpty(timerList))
+            {
+                StringBuilder jobName;
+                StringBuilder triggerName;
+                Long timerTime;
+                String cronExpression;
+                Map<String, Object> para;
+                for (JSONObject timer : timerList)
+                {
+                    timerTime = timer.getLong("timer_task_time");
+                    if (null != timerTime && timerTime != 0)
+                    {
+                        cronExpression = MailCronExpressionUtil.getMailCronExpressionByTime(timerTime);
+                        jobName = new StringBuilder().append(mailJobName).append("_").append(companyId).append("_").append(timer.getLongValue("id"));
+                        triggerName = new StringBuilder().append(mailTriggerName).append("_").append(companyId).append("_").append(timer.getLongValue("id"));
+                        if (!QuartzManager.getInstance().checkJobExistence(jobName.toString(), null))
+                        {
+                            para = new HashMap<>();
+                            para.put("companyId", companyId);
+                            para.put("mailId", mailId);
+                            para.put("employeeId", employeeId);
+                            QuartzManager.getInstance().addJob(jobName.toString(), triggerName.toString(), EmailSenderJob.class, cronExpression, para);
+                        }
+                        else
+                        {
+                            QuartzManager.getInstance().modifyJobTime(jobName.toString(), triggerName.toString(), cronExpression);
+                        }
+                    }
+                }
+            }
+        }
+        
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         return serviceResult;
         
@@ -953,15 +1003,42 @@ public class MailOperationServiceImpl implements MailOperationService
         ServiceResult<String> serviceResult = new ServiceResult<>();
         JSONObject mailReleventInfo = JSONObject.parseObject(jsonStr);
         String mailBoxScopeName = DAOUtil.getTableName(mailBoxScope, companyId);
+        String mailBodyName = DAOUtil.getTableName(mailBodyTable, companyId);
         String mailId = mailReleventInfo.getString("id");
-        StringBuilder updateSqlSB = new StringBuilder().append("update ").append(mailBoxScopeName).append(" set mail_box_id =");
-        updateSqlSB.append(MailConstant.MAIL_BOX_DELETE).append(" where id in(").append(mailId).append(")");
-        int updateSqlResult = DAOUtil.executeUpdate(updateSqlSB.toString());
-        if (updateSqlResult <= 0)
+        if (StringUtils.isNotEmpty(mailId))
         {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
-            return serviceResult;
+            StringBuilder updateSqlSB = new StringBuilder().append("update ").append(mailBoxScopeName).append(" set mail_box_id =");
+            updateSqlSB.append(MailConstant.MAIL_BOX_DELETE).append(" where id in(").append(mailId).append(")");
+            int updateSqlResult = DAOUtil.executeUpdate(updateSqlSB.toString());
+            if (updateSqlResult <= 0)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
+            StringBuilder queryTimerSQLSB = new StringBuilder().append("select mbs.id,mb.timer_task_time from ").append(mailBoxScopeName);
+            queryTimerSQLSB.append(" mbs join ").append(mailBodyName).append(" mb on mbs.mail_id = mb.id where mbs.id in (").append(mailId).append(")");
+            List<JSONObject> timerList = DAOUtil.executeQuery4JSON(queryTimerSQLSB.toString());
+            if (!Collections.isEmpty(timerList))
+            {
+                StringBuilder jobName;
+                StringBuilder triggerName;
+                Long timerTime;
+                for (JSONObject timer : timerList)
+                {
+                    timerTime = timer.getLong("timer_task_time");
+                    if (null != timerTime && timerTime != 0)
+                    {
+                        jobName = new StringBuilder().append(mailJobName).append("_").append(companyId).append("_").append(timer.getLongValue("id"));
+                        triggerName = new StringBuilder().append(mailTriggerName).append("_").append(companyId).append("_").append(timer.getLongValue("id"));
+                        if (QuartzManager.getInstance().checkJobExistence(jobName.toString(), null))
+                        {
+                            QuartzManager.getInstance().removeJob(jobName.toString(), triggerName.toString());
+                        }
+                    }
+                }
+            }
         }
+        
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         return serviceResult;
         
@@ -1021,7 +1098,9 @@ public class MailOperationServiceImpl implements MailOperationService
         
         StringBuilder querySQLSB = new StringBuilder().append(
             "select mb.mail_content,mb.from_recipient,mb.subject,mb.bcc_recipients,mb.mail_source,mb.embedded_images,mb.is_track,mb.bcc_setting,mb.attachments_name,mb.to_recipients,mb.cc_recipients,mb.is_emergent,mb.is_plain,mb.is_notification,mb.send_status,");
-        querySQLSB.append(" mbs.id,mbs.approval_status,mbs.read_status,mbs.timer_status,mbs.create_time,mbs.draft_status,tag.mail_tags,tag.mail_colors,mbs.mail_box_id from ");
+        querySQLSB.append(" mbs.id,mbs.approval_status,mbs.read_status,mbs.timer_status,mbs.create_time,mbs.draft_status,tag.mail_tags,tag.mail_colors,mbs.mail_box_id,")
+            .append(type)
+            .append(" as type from ");
         querySQLSB.append(mailBoxTableName).append(" mbs join (select * from ").append(mailBodyTableName);
         querySQLSB.append(") mb on mbs.mail_id = mb.id");
         querySQLSB.append(" left join (select mts.mail_belong_id,string_agg(mt.name,',') as mail_tags,string_agg (mt.boarder, ',') as mail_colors from mail_tag_scope_")
@@ -1068,14 +1147,15 @@ public class MailOperationServiceImpl implements MailOperationService
         }
         querySQLSB.append(") mb on mbs.mail_id = mb.id");
         querySQLSB.append(" left join mail_tag_scope_").append(companyId).append(" mts on mbs.id = mts.mail_belong_id ");
-        querySQLSB.append(" join (select mts.mail_belong_id,string_agg(mt.name,',') as mail_tags,string_agg (mt.boarder, ',') as mail_colors from mail_tag_scope_")
-            .append(companyId)
-            .append(" mts,mail_tag_")
+        querySQLSB.append(" left join (select mts.mail_belong_id,string_agg(mt.name,',') as mail_tags,string_agg (mt.boarder, ',') as mail_colors from mail_tag_scope_")
             .append(companyId);
-        querySQLSB.append(" mt where position(mt.id in mts.tag_id) > 0  and mt.del_status = 0 and mt.status = 0")
-            .append(" GROUP BY mts.mail_belong_id ) tag on tag.mail_belong_id = mbs.id");
+        querySQLSB.append(" mts,mail_tag_")
+            .append(companyId)
+            .append(" mt where position(mt.id in mts.tag_id) > 0 and mt.del_status = 0 and mt.status = 0 and mt.employee_id =")
+            .append(employeeId);
+        querySQLSB.append(" GROUP BY mts.mail_belong_id ) tag on tag.mail_belong_id = mbs.id");
         querySQLSB.append(" where mbs.employee_id = ").append(employeeId).append(" and position('").append(tagId).append("' in mts.tag_id) > 0");
-        querySQLSB.append(" and mbs.del_status = 0").append(" order by mbs.id desc");
+        querySQLSB.append(" and mbs.del_status = 0").append(" order by mbs.create_time desc");
         List<String> list = new ArrayList<>();
         list.add("to_recipients");
         list.add("cc_recipients");
@@ -1217,7 +1297,7 @@ public class MailOperationServiceImpl implements MailOperationService
         Long accountId = mailBody.getLongValue("account_id");
         Long timerTime = mailBody.getLong("timer_task_time");
         boolean timerStatus = false;
-        if (timerTime != null && timerTime != 0l)
+        if (timerTime != null && timerTime != 0L)
         {
             timerStatus = true;
         }
@@ -1232,25 +1312,38 @@ public class MailOperationServiceImpl implements MailOperationService
         mailLinkInfo.setProtocol("smtp");
         mailBody.remove("personnel_approverBy");
         mailBody.remove("personnel_ccTo");
-        // 发送邮件
-        boolean sendResult = MailOprationUtil.getInstance().sendEmail(mailBody, mailLinkInfo, companyId, employeeId);
-        boolean sendFlag = true;
-        if (!sendResult)
-        {
-            sendFlag = false;
-        }
-        // 获取插入数据的字段信息
-        String fields = SqlOperationUtil.getInsertSqlFieldsInfo(mailBody, MailConstant.SQL_POSITION_FEILD);
-        // 获取插入数据的值得信息
-        String values = SqlOperationUtil.getInsertSqlFieldsInfo(mailBody, MailConstant.SQL_POSITION_VALUE);
         // 拼接插入SQL语句
         String tableName = DAOUtil.getTableName(mailBodyTable, companyId);
-        StringBuilder insertSQLSB = new StringBuilder().append("insert into ").append(tableName);
-        insertSQLSB.append(frontBracket).append(fields).append(comma).append("employee_id");
-        insertSQLSB.append(comma).append("send_status").append(backBracket).append(" values ");
-        insertSQLSB.append(frontBracket).append(values).append(comma).append(employeeId);
-        insertSQLSB.append(comma).append(sendFlag ? 1 : 0).append(backBracket);
-        int result = DAOUtil.executeUpdate(insertSQLSB.toString());
+        StringBuilder insertSQLSB = new StringBuilder();
+        // 拼接插入SQL语句
+        insertSQLSB.append("insert into ").append(tableName).append(
+            " (mail_content,from_recipient,subject,mail_source,bcc_recipients,timer_task_time,is_track,bcc_setting,attachments_name,to_recipients,is_emergent,cc_recipients,signature_id,account_id,from_recipient_name,single_show,is_plain,is_signature,is_encryption,is_notification,cc_setting,employee_id,send_status)");
+        insertSQLSB.append(" values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);");
+        List<Object> insertData = new ArrayList<>();
+        insertData.add(mailBody.get("mail_content"));
+        insertData.add(mailBody.get("from_recipient"));
+        insertData.add(mailBody.get("subject"));
+        insertData.add(mailBody.get("mail_source"));
+        insertData.add(mailBody.getJSONArray("bcc_recipients").toString());
+        insertData.add(null == mailBody.get("timer_task_time") ? null : mailBody.getLong("timer_task_time"));
+        insertData.add(null == mailBody.get("is_track") ? 0 : mailBody.get("is_track"));
+        insertData.add(null == mailBody.get("bcc_setting") ? 0 : mailBody.get("bcc_setting"));
+        insertData.add(mailBody.getJSONArray("attachments_name").toString());
+        insertData.add(mailBody.getJSONArray("to_recipients").toString());
+        insertData.add(null == mailBody.get("is_emergent") ? 0 : mailBody.get("is_emergent"));
+        insertData.add(mailBody.getJSONArray("cc_recipients").toString());
+        insertData.add(Objects.isNull(mailBody.getLong("signature_id")) ? null : mailBody.get("signature_id"));
+        insertData.add(mailBody.get("account_id"));
+        insertData.add(mailBody.get("from_recipient_name"));
+        insertData.add(null == mailBody.get("single_show") ? 0 : mailBody.get("single_show"));
+        insertData.add(null == mailBody.get("is_plain") ? 0 : mailBody.get("is_plain"));
+        insertData.add(null == mailBody.get("is_signature") ? 0 : mailBody.get("is_signature"));
+        insertData.add(null == mailBody.get("is_encryption") ? 0 : mailBody.get("is_encryption"));
+        insertData.add(null == mailBody.get("is_notification") ? 0 : mailBody.get("is_notification"));
+        insertData.add(null == mailBody.get("cc_setting") ? 0 : mailBody.get("cc_setting"));
+        insertData.add(employeeId);
+        insertData.add(1);
+        int result = DAOUtil.executeUpdate(insertSQLSB.toString(), insertData);
         if (result <= 0)
         {
             return false;
@@ -1266,6 +1359,37 @@ public class MailOperationServiceImpl implements MailOperationService
         if (insertBoxResult <= 0)
         {
             return false;
+        }
+        if (timerStatus)
+        {
+            // 定时任务发送
+            String cronExpression = MailCronExpressionUtil.getMailCronExpressionByTime(timerTime);
+            StringBuilder jobName = new StringBuilder().append(mailJobName).append("_").append(companyId).append("_").append(mailId);
+            StringBuilder triggerName = new StringBuilder().append(mailTriggerName).append("_").append(companyId).append("_").append(mailId);
+            Map<String, Object> para = new HashMap<>();
+            para.put("companyId", companyId);
+            para.put("mailId", mailId);
+            para.put("employeeId", employeeId);
+            if (!QuartzManager.getInstance().checkJobExistence(jobName.toString(), null))
+            {
+                QuartzManager.getInstance().addJob(jobName.toString(), triggerName.toString(), EmailSenderJob.class, cronExpression, para);
+            }
+            else
+            {
+                QuartzManager.getInstance().modifyJobTime(jobName.toString(), triggerName.toString(), cronExpression);
+            }
+            
+        }
+        else
+        {
+            // 非定时任务发送
+            boolean sendResult = MailOprationUtil.getInstance().sendEmail(mailBody, mailLinkInfo, companyId, employeeId);
+            if (!sendResult)
+            {
+                StringBuilder updateSqlSB = new StringBuilder().append("update ").append(tableName).append(" set send_status = 0 ");
+                updateSqlSB.append(" where id = (select mail_id from ").append(boxTable).append(" where id =").append(mailId).append(")");
+                DAOUtil.executeUpdate(updateSqlSB.toString());
+            }
         }
         if (null != operationType || operationType.intValue() != 0)
         {
@@ -1350,7 +1474,7 @@ public class MailOperationServiceImpl implements MailOperationService
             return serviceResult;
         }
         // 定时任务时间
-        if (timerTaskTime != null && timerTaskTime != 0l)
+        if (timerTaskTime != null && timerTaskTime != 0L)
         {
             String cronExpression = MailCronExpressionUtil.getMailCronExpressionByTime(timerTaskTime);
             StringBuilder jobName = new StringBuilder().append(mailJobName).append("_").append(companyId).append("_").append(id);
@@ -1384,9 +1508,9 @@ public class MailOperationServiceImpl implements MailOperationService
         String bodyName = DAOUtil.getTableName(mailBodyTable, companyId);
         String boxTable = DAOUtil.getTableName(mailBoxScope, companyId);
         // 定时任务时间
-        Long timerTime = mailBody.getLongValue("timer_task_time");
+        Long timerTime = mailBody.getLong("timer_task_time");
         boolean timerStatus = false;
-        if (timerTime != null && timerTime != 0l)
+        if (timerTime != null && timerTime != 0L)
         {
             timerStatus = true;
         }
@@ -1398,6 +1522,51 @@ public class MailOperationServiceImpl implements MailOperationService
         mailLinkInfo.setServer(settingObj.getString("send_server"));
         mailLinkInfo.setPort(settingObj.getInteger("send_server_port"));
         mailLinkInfo.setProtocol("smtp");
+        StringBuilder insertSQLSB = new StringBuilder();
+        // 拼接插入SQL语句
+        insertSQLSB.append("insert into ").append(bodyName).append(
+            " (mail_content,from_recipient,subject,mail_source,bcc_recipients,timer_task_time,is_track,bcc_setting,attachments_name,to_recipients,is_emergent,cc_recipients,signature_id,account_id,from_recipient_name,single_show,is_plain,is_signature,is_encryption,is_notification,cc_setting,employee_id,send_status)");
+        insertSQLSB.append(" values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);");
+        List<Object> insertData = new ArrayList<>();
+        insertData.add(mailBody.get("mail_content"));
+        insertData.add(mailBody.get("from_recipient"));
+        insertData.add(mailBody.get("subject"));
+        insertData.add(mailBody.get("mail_source"));
+        insertData.add(mailBody.getJSONArray("bcc_recipients").toString());
+        insertData.add(null == mailBody.get("timer_task_time") ? null : mailBody.getLong("timer_task_time"));
+        insertData.add(null == mailBody.get("is_track") ? 0 : mailBody.get("is_track"));
+        insertData.add(null == mailBody.get("bcc_setting") ? 0 : mailBody.get("bcc_setting"));
+        insertData.add(mailBody.getJSONArray("attachments_name").toString());
+        insertData.add(mailBody.getJSONArray("to_recipients").toString());
+        insertData.add(null == mailBody.get("is_emergent") ? 0 : mailBody.get("is_emergent"));
+        insertData.add(mailBody.getJSONArray("cc_recipients").toString());
+        insertData.add(Objects.isNull(mailBody.getLong("signature_id")) ? null : mailBody.get("signature_id"));
+        insertData.add(mailBody.get("account_id"));
+        insertData.add(mailBody.get("from_recipient_name"));
+        insertData.add(null == mailBody.get("single_show") ? 0 : mailBody.get("single_show"));
+        insertData.add(null == mailBody.get("is_plain") ? 0 : mailBody.get("is_plain"));
+        insertData.add(null == mailBody.get("is_signature") ? 0 : mailBody.get("is_signature"));
+        insertData.add(null == mailBody.get("is_encryption") ? 0 : mailBody.get("is_encryption"));
+        insertData.add(null == mailBody.get("is_notification") ? 0 : mailBody.get("is_notification"));
+        insertData.add(null == mailBody.get("cc_setting") ? 0 : mailBody.get("cc_setting"));
+        insertData.add(employeeId);
+        insertData.add(1);
+        int result = DAOUtil.executeUpdate(insertSQLSB.toString(), insertData);
+        if (result <= 0)
+        {
+            return false;
+        }
+        Long mailId = BusinessDAOUtil.geCurrval4Table(mailBodyTable, companyId.toString());
+        // 插入发件箱数据
+        StringBuilder insertBoxSqlSB = new StringBuilder().append("insert into ").append(boxTable);
+        insertBoxSqlSB.append(" (mail_id,employee_id,mail_box_id,create_time,approval_status,timer_status)").append(" values (");
+        insertBoxSqlSB.append(mailId).append(comma).append(employeeId).append(comma).append(timerStatus ? MailConstant.MAIL_BOX_DRAFT : MailConstant.MAIL_BOX_SENT).append(comma);
+        insertBoxSqlSB.append(System.currentTimeMillis()).append(comma).append(10).append(comma).append(timerStatus ? '1' : '0').append(backBracket);
+        int insertBoxResult = DAOUtil.executeUpdate(insertBoxSqlSB.toString());
+        if (insertBoxResult <= 0)
+        {
+            return false;
+        }
         // 2.判断是否为定时任务
         if (timerStatus)
         {
@@ -1533,7 +1702,7 @@ public class MailOperationServiceImpl implements MailOperationService
         Long timerTime = mailBody.getLong("timer_task_time");
         boolean timerStatus = false;
         int approvalIntegerStatus = Integer.valueOf(approvalStatus.trim());
-        if (timerTime != null && timerTime != 0l)
+        if (timerTime != null && timerTime != 0L)
         {
             timerStatus = true;
         }

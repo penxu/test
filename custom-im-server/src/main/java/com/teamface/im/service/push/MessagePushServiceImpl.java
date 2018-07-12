@@ -35,7 +35,7 @@ import io.jsonwebtoken.lang.Collections;
  * @version: 1.0
  */
 @Service("messagePushService")
-public class MessagePushServiceImpl extends MessagePushServiceAbstract implements MessagePushService
+public class MessagePushServiceImpl extends BaseMessagePushService implements MessagePushService
 {
     private static Logger log = Logger.getLogger(MessagePushServiceImpl.class);
     
@@ -81,11 +81,9 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             JSONObject beanInfo = DAOUtil.executeQuery4FirstJSON(queryBeanInfo.toString());
             type = ImConstant.PUSHE_MESSAGE_TYPE_CUSTOM;
             // 查询员工信息
-            StringBuilder queryEmployeeInfo = new StringBuilder().append("select e.employee_name from acountinfo a,employee_")
-                .append(companyId)
-                .append(" e where a.id = ")
-                .append(signId)
-                .append(" and a.employee_id = e.id");
+            StringBuilder queryEmployeeInfo =
+                new StringBuilder().append("select e.employee_name from acountinfo a,employee_").append(companyId).append(" e where a.id = ").append(signId).append(
+                    " and a.employee_id = e.id");
             JSONObject employeeObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeInfo.toString());
             senderName = employeeObj.getString("employee_name");
             beanChineseName = beanInfo.getString("chinese_name");
@@ -103,11 +101,9 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             style = settings.getInteger("style");
             dataId = commentJson.getLongValue("relation_id");
             // 查询员工信息
-            StringBuilder queryEmployeeInfo = new StringBuilder().append("select e.employee_name from acountinfo a,employee_")
-                .append(companyId)
-                .append(" e where a.id = ")
-                .append(signId)
-                .append(" and a.employee_id = e.id");
+            StringBuilder queryEmployeeInfo =
+                new StringBuilder().append("select e.employee_name from acountinfo a,employee_").append(companyId).append(" e where a.id = ").append(signId).append(
+                    " and a.employee_id = e.id");
             JSONObject employeeObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeInfo.toString());
             StringBuilder queryCatalogNameSB = new StringBuilder().append("select name from catalog_").append(companyId).append(" where id = ").append(dataId);
             JSONObject catalogName = DAOUtil.executeQuery4FirstJSON(queryCatalogNameSB.toString());
@@ -131,11 +127,9 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             dataId = commentJson.getLongValue("relation_id");
             type = ImConstant.PUSHE_MESSAGE_TYPE_COMMENT;
             // 查询员工信息
-            StringBuilder queryEmployeeInfo = new StringBuilder().append("select e.employee_name from acountinfo a,employee_")
-                .append(companyId)
-                .append(" e where a.id = ")
-                .append(signId)
-                .append(" and a.employee_id = e.id");
+            StringBuilder queryEmployeeInfo =
+                new StringBuilder().append("select e.employee_name from acountinfo a,employee_").append(companyId).append(" e where a.id = ").append(signId).append(
+                    " and a.employee_id = e.id");
             JSONObject employeeObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeInfo.toString());
             senderName = employeeObj.getString("employee_name");
             beanName = "memo";
@@ -152,11 +146,9 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             dataId = commentJson.getLongValue("relation_id");
             type = ImConstant.PUSHE_MESSAGE_TYPE_COMMENT;
             // 查询员工信息
-            StringBuilder queryEmployeeInfo = new StringBuilder().append("select e.employee_name from acountinfo a,employee_")
-                .append(companyId)
-                .append(" e where a.id = ")
-                .append(signId)
-                .append(" and a.employee_id = e.id");
+            StringBuilder queryEmployeeInfo =
+                new StringBuilder().append("select e.employee_name from acountinfo a,employee_").append(companyId).append(" e where a.id = ").append(signId).append(
+                    " and a.employee_id = e.id");
             JSONObject employeeObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeInfo.toString());
             senderName = employeeObj.getString("employee_name");
             beanName = "email";
@@ -174,11 +166,9 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             dataId = commentJson.getLongValue("relation_id");
             type = ImConstant.PUSHE_MESSAGE_TYPE_COMMENT;
             // 查询员工信息
-            StringBuilder queryEmployeeInfo = new StringBuilder().append("select e.employee_name from acountinfo a,employee_")
-                .append(companyId)
-                .append(" e where a.id = ")
-                .append(signId)
-                .append(" and a.employee_id = e.id");
+            StringBuilder queryEmployeeInfo =
+                new StringBuilder().append("select e.employee_name from acountinfo a,employee_").append(companyId).append(" e where a.id = ").append(signId).append(
+                    " and a.employee_id = e.id");
             JSONObject employeeObj = DAOUtil.executeQuery4FirstJSON(queryEmployeeInfo.toString());
             senderName = employeeObj.getString("employee_name");
             beanName = "approval";
@@ -186,14 +176,16 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             // 查询发送的助手相关信息
             assistantObj = ImAssistantDAO.queryAssistantBasedOnType(companyId, ImConstant.ASSISTANT_TYPE_APPROVAL);
         }
+        StringBuilder atInfo = new StringBuilder(senderName).append("@");
+        StringBuilder pushAtContent = new StringBuilder(atInfo).append(":").append(content);
         jsonContent.put("bean_name", beanName);
         jsonContent.put("bean_name_chinese", beanChineseName);
-        jsonContent.put("push_content", content);
-        jsonContent.put("title", "有人@你");
+        jsonContent.put("push_content", pushAtContent);
+        jsonContent.put("title", atInfo);
         jsonContent.put("sender_name", senderName);
         jsonContent.put("type", type);
         Long currentTime = System.currentTimeMillis();
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != assistantObj)
         {
             assistantId = assistantObj.getLongValue("id");
@@ -202,11 +194,11 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         jsonContent.put("assistant_id", assistantId);
         if (beanName.equals("approval"))
         {
-            PushMessageContentDAO.saveApproval(companyId, assistantId, content, currentTime, assistantId, type, approvalParmas, beanName, beanChineseName);
+            PushMessageContentDAO.saveApproval(companyId, assistantId, pushAtContent.toString(), currentTime, assistantId, type, approvalParmas, beanName, beanChineseName);
         }
         else
         {
-            PushMessageContentDAO.save(companyId, assistantId, content, currentTime, dataId, type, style, beanName, beanChineseName);
+            PushMessageContentDAO.save(companyId, assistantId, pushAtContent.toString(), currentTime, dataId, type, style, beanName, beanChineseName);
         }
         jsonContent.put("create_time", createTime);
         List<Object[]> insertData = new ArrayList<>();
@@ -249,7 +241,7 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         Long currentTime = System.currentTimeMillis();
         JSONObject assistantObj = ImAssistantDAO.queryAssistantBasedOnType(companyId, ImConstant.ASSISTANT_TYPE_APPROVAL);
         msgs.put("type", ImConstant.PUSHE_MESSAGE_TYPE_APPROVE);
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != assistantObj)
         {
             assistantId = assistantObj.getLongValue("id");
@@ -266,7 +258,7 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
             assistantId,
             msgs.getString("push_content"),
             currentTime,
-            0l,
+            0L,
             ImConstant.PUSHE_MESSAGE_TYPE_APPROVE,
             paramFields == null ? " " : paramFields.toString(),
             beanName,
@@ -280,7 +272,8 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
                 JSONObject filedInfo = (JSONObject)object;
                 obj = new ArrayList<>();
                 String fieldLabel = filedInfo.getString("field_label");
-                if(StringUtils.isNotEmpty(fieldLabel)) {
+                if (StringUtils.isNotEmpty(fieldLabel))
+                {
                     String fieldValue = filedInfo.getString("field_value");
                     obj.add(currentId);
                     obj.add(fieldLabel);
@@ -289,10 +282,11 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
                 }
             }
         }
-        if(!Collections.isEmpty(insertFieldData)) {
+        if (!Collections.isEmpty(insertFieldData))
+        {
             PushMessageField.batchSave(companyId, insertFieldData);
         }
-       
+        
         List<Object[]> insertData = new ArrayList<>();
         List<Object> obj;
         StringBuilder receivers = new StringBuilder();
@@ -347,7 +341,7 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         // 获取当前公司的助手企信小助手的ID
         StringBuilder queryAssistantSqlSB = new StringBuilder().append("select id from im_assistant where company_id = ").append(companyId).append(" and type = 2");
         JSONObject assistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != assistantObj)
         {
             assistantId = assistantObj.getLongValue("id");
@@ -406,7 +400,7 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         Long currentTime = System.currentTimeMillis();
         JSONObject assistantObj = ImAssistantDAO.queryAssistantBasedOnType(companyId, ImConstant.ASSISTANT_TYPE_MEMO);
         msgs.put("type", ImConstant.PUSHE_MESSAGE_TYPE_MEMO);
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != assistantObj)
         {
             assistantId = assistantObj.getLongValue("id");
@@ -414,15 +408,8 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         msgs.put("assistant_id", assistantId);
         msgs.put("create_time", currentTime);
         // 保存推送信息
-        PushMessageContentDAO.save(companyId,
-            assistantId,
-            msgs.getString("push_content"),
-            currentTime,
-            msgs.getLongValue("data_id"),
-            ImConstant.PUSHE_MESSAGE_TYPE_MEMO,
-            null,
-            "memo",
-            "备忘录");
+        PushMessageContentDAO
+            .save(companyId, assistantId, msgs.getString("push_content"), currentTime, msgs.getLongValue("data_id"), ImConstant.PUSHE_MESSAGE_TYPE_MEMO, null, "memo", "备忘录");
         Long currentId = BusinessDAOUtil.geCurrval4Table("push_message_content", String.valueOf(companyId));
         List<Object[]> insertData = new ArrayList<>();
         List<Object> obj;
@@ -461,7 +448,7 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         Long currentTime = System.currentTimeMillis();
         JSONObject assistantObj = ImAssistantDAO.queryAssistantBasedOnType(companyId, ImConstant.ASSISTANT_TYPE_APPLICATION_CHAT);
         msgs.put("type", ImConstant.PUSHE_MESSAGE_TYPE_AUTOMATION);
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != assistantObj)
         {
             assistantId = assistantObj.getLongValue("id");
@@ -498,7 +485,8 @@ public class MessagePushServiceImpl extends MessagePushServiceAbstract implement
         Long signId = info.getSignId();
         JSONObject msgs = new JSONObject();
         msgs.put("type", type);
-        if(type == Constant.PUSH_MESSAGE_QUIT_SESSION){
+        if (type == Constant.PUSH_MESSAGE_QUIT_SESSION)
+        {
             msgs.put("describe", "This is notification of quiting session.");
         }
         PushAsynHandle.pushMsg(msgs.toJSONString(), new String[] {signId.toString()}, null);

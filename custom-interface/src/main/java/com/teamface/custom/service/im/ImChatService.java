@@ -291,7 +291,7 @@ public interface ImChatService
      * @return
      * @Description:修改审批推送参数接口
      */
-    public boolean modifyPushMessageContent(String token, Long id, String param);
+    public boolean modifyPushMessageContent(String token, Long id, String paramValue, String paramWhere);
     
     /**
      * 
@@ -302,4 +302,13 @@ public interface ImChatService
      * @Description:推送群组信息
      */
     public void pushGroup(Integer type, Long groupId, String groupName, String notice);
+    
+    /**
+     * 
+     * @param token 请求接口凭证
+     * @param signId 更改对象的signId
+     * @return true转换成功，false转换失败
+     * @Description: 转让企业更改公司总群管理员
+     */
+    public boolean updateGroupManager(String token, String signId);
 }

@@ -44,82 +44,104 @@ public class FirstThread extends Thread
     
     public void run()
     {
-        // 获取消息推送信息
-        List<String> dataList = rabbitMQServer.getMessagesNonblocking("allot", 10);
         
-        if (!dataList.isEmpty())
+        while (true)
         {
-            for (int k = 0; k < dataList.size(); k++)
+            if (rabbitMQServer.getCountOfQueue(Constant.AUTOMATION_THREAD_QUEUE_NAME) > 0)
             {
-                JSONObject dataJson = JSONObject.parseObject(dataList.get(k));
-                InfoVo info = TokenMgr.obtainInfo(dataJson.getString("token"));
-                JSONArray jsonArrarList = new JSONArray();
-                String ruleName = DAOUtil.getTableName("automation", info.getCompanyId());
-                StringBuilder buf = new StringBuilder("select count(*) from " + ruleName + " where del_status = '" + Constant.CURRENCY_ZERO + "' and bean = '"
-                    + dataJson.get("bean") + "' and (triggers = '" + dataJson.getIntValue("trigger") + "' or triggers = 2)");
-                int count = DAOUtil.executeCount(buf.toString());
-                if (count > 0)
+                // 获取消息推送信息
+                List<String> dataList = rabbitMQServer.getMessagesNonblocking(Constant.AUTOMATION_THREAD_QUEUE_NAME, 10);
+                
+                if (!dataList.isEmpty())
                 {
-                    StringBuilder builder = new StringBuilder("select * from " + ruleName + " where del_status = '" + Constant.CURRENCY_ZERO + "' and bean = '"
-                        + dataJson.get("bean") + "' and (triggers = '" + dataJson.getIntValue("trigger") + "' or triggers = 2) order by id asc");
-                    List<JSONObject> jsonObject = DAOUtil.executeQuery4JSON(builder.toString());
-                    if (!jsonObject.isEmpty() || jsonObject.size() > 0)
+                    for (int k = 0; k < dataList.size(); k++)
                     {
-                        for (int i = 0; i < jsonObject.size(); i++)
+                        JSONObject dataJson = JSONObject.parseObject(dataList.get(k));
+                        InfoVo info = TokenMgr.obtainInfo(dataJson.getString("token"));
+                        JSONArray jsonArrarList = new JSONArray();
+                        String ruleName = DAOUtil.getTableName("automation", info.getCompanyId());
+                        StringBuilder buf = new StringBuilder("select count(*) from " + ruleName + " where del_status = '" + Constant.CURRENCY_ZERO + "' and bean = '"
+                            + dataJson.get("bean") + "' and (triggers = '" + dataJson.getIntValue("trigger") + "' or triggers = 2)");
+                        int count = DAOUtil.executeCount(buf.toString());
+                        if (count > 0)
                         {
-                            JSONObject data = jsonObject.get(i);
-                            
-                            String beanName = DAOUtil.getTableName(data.getString("bean"), info.getCompanyId());
-                            // 任何条件
-                            if (data.getInteger("condition") == Constant.CURRENCY_ZERO)
+                            StringBuilder builder = new StringBuilder("select * from " + ruleName + " where del_status = '" + Constant.CURRENCY_ZERO + "' and bean = '"
+                                + dataJson.get("bean") + "' and (triggers = '" + dataJson.getIntValue("trigger") + "' or triggers = 2) order by id asc");
+                            List<JSONObject> jsonObject = DAOUtil.executeQuery4JSON(builder.toString());
+                            if (!jsonObject.isEmpty())
                             {
-                                JSONArray idJson = dataJson.getJSONArray("id");
-                                for (int j = 0; j < idJson.size(); j++)
+                                for (int i = 0; i < jsonObject.size(); i++)
                                 {
-                                    JSONObject dataId = idJson.getJSONObject(j);
-                                    StringBuilder queryBuilder = new StringBuilder("select * from " + beanName + " where id = " + dataId.getLongValue("id"));
-                                    JSONObject jsonList = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
-                                    // 规则分配
-                                    if (null != jsonList)
+                                    JSONObject data = jsonObject.get(i);
+                                    
+                                    String beanName = DAOUtil.getTableName(data.getString("bean"), info.getCompanyId());
+                                    // 任何条件
+                                    if (data.getInteger("condition") == Constant.CURRENCY_ZERO)
                                     {
-                                        // 操作
-                                        commonHandle(jsonList, data, dataJson.getString("token"));
+                                        JSONArray idJson = dataJson.getJSONArray("id");
+                                        for (int j = 0; j < idJson.size(); j++)
+                                        {
+                                            JSONObject dataId = idJson.getJSONObject(j);
+                                            StringBuilder queryBuilder = new StringBuilder("select * from " + beanName + " where id = " + dataId.getLongValue("id"));
+                                            JSONObject jsonList = DAOUtil.executeQuery4FirstJSON(queryBuilder.toString());
+                                            // 规则分配
+                                            if (null != jsonList)
+                                            {
+                                                // 操作
+                                                commonHandle(jsonList, data, dataJson.getString("token"));
+                                            }
+                                        }
+                                        break;
+                                    }
+                                    // 选配条件
+                                    else if (data.getInteger("condition") == Constant.CURRENCY_ONE)
+                                    {
+                                        // 组装条件
+                                        String commSql = data.getString("query_condition");
+                                        commSql = commSql.replace(Constant.VAR_QUOTES, "'");
+                                        // 返回条件sql语句
+                                        JSONArray idJson = dataJson.getJSONArray("id");
+                                        // 拼装sql 查询是否又符合语句
+                                        for (int j = 0; j < idJson.size(); j++)
+                                        {
+                                            JSONObject dataId = idJson.getJSONObject(j);
+                                            StringBuilder queryBuil =
+                                                new StringBuilder("select * from " + beanName + " where id = " + dataId.getLongValue("id") + " and " + commSql);
+                                            JSONObject jsonList = DAOUtil.executeQuery4FirstJSON(queryBuil.toString());
+                                            if (null != jsonList)
+                                            {
+                                                // 操作
+                                                commonHandle(jsonList, data, dataJson.getString("token"));
+                                            }
+                                            else
+                                            {// 不匹配数据则替换需要下次运行的数据
+                                                jsonArrarList.add(dataId);
+                                            }
+                                        }
+                                        dataJson.put("id", jsonArrarList);
                                     }
                                 }
-                                break;
-                            }
-                            // 选配条件
-                            else if (data.getInteger("condition") == Constant.CURRENCY_ONE)
-                            {
-                                // 组装条件
-                                String commSql = data.getString("query_condition");
-                                commSql = commSql.replace(Constant.VAR_QUOTES, "'");
-                                // 返回条件sql语句
-                                JSONArray idJson = dataJson.getJSONArray("id");
-                                // 拼装sql 查询是否又符合语句
-                                for (int j = 0; j < idJson.size(); j++)
-                                {
-                                    JSONObject dataId = idJson.getJSONObject(j);
-                                    StringBuilder queryBuil = new StringBuilder("select * from " + beanName + " where id = " + dataId.getLongValue("id") + " and " + commSql);
-                                    JSONObject jsonList = DAOUtil.executeQuery4FirstJSON(queryBuil.toString());
-                                    if (null != jsonList)
-                                    {
-                                        // 操作
-                                        commonHandle(jsonList, data, dataJson.getString("token"));
-                                    }
-                                    else
-                                    {// 不匹配数据则替换需要下次运行的数据
-                                        jsonArrarList.add(dataId);
-                                    }
-                                }
-                                dataJson.put("id", jsonArrarList);
                             }
                         }
+                        
                     }
                 }
-                
+                LOG.debug(String.format(" FirstThread end!"));
             }
+            else
+            {
+                try
+                {
+                    Thread.sleep(5000);
+                }
+                catch (InterruptedException e)
+                {
+                    LOG.error(e.getMessage(), e);
+                }
+            }
+            
         }
+        
     }
     
     /**
@@ -255,23 +277,23 @@ public class FirstThread extends Thread
         {
             JSONArray jsonArrayList = jsonObject.getJSONArray("allot_employee");
             
-            Object objectReult = JedisClusterHelper.get("ruleIndex" + data.getLong("id"));
+            Object objectReult = JedisClusterHelper.get("ruleIndex" + companyId + data.getLong("id"));
             if (null == objectReult)
             {
-                JedisClusterHelper.set("ruleIndex" +  data.getLong("id"), 0);
+                JedisClusterHelper.set("ruleIndex" + companyId + data.getLong("id"), 0);
             }
             List<Object> model = new ArrayList<>();
             for (int j = 0; j < jsonArrayList.size(); j++)
             {
                 JSONObject json = jsonArrayList.getJSONObject(j);
                 // 转换拉取选人数据
-                commonJSON(json, companyId, model);
+                commonJSON(json, companyId, model, data.getLong("id"));
             }
             // 分配人规则 0随机 1轮循
             String beanName = DAOUtil.getTableName(data.getString("bean"), companyId);
-            Object object = JedisClusterHelper.get("ruleId" + companyId);
+            Object object = JedisClusterHelper.get("ruleId" + companyId + data.getLong("id"));
             List<Object> objectlist = (List<Object>)object;
-            Object sum = JedisClusterHelper.get("ruleIndex" + data.getLong("id"));
+            Object sum = JedisClusterHelper.get("ruleIndex" + companyId + data.getLong("id"));
             Object objectUser = null;
             // 机制 0 轮询
             if (jsonObject.getInteger("allot") == Constant.CURRENCY_ZERO)
@@ -282,13 +304,13 @@ public class FirstThread extends Thread
                 {
                     objectUser = objectlist.get(number);
                     int sumNumber = number + 1;
-                    JedisClusterHelper.set("ruleIndex" + data.getLong("id"), sumNumber);
+                    JedisClusterHelper.set("ruleIndex" + companyId + data.getLong("id"), sumNumber);
                 }
                 else
                 {
                     objectUser = objectlist.get(0);
                     int sumNumber = 1;
-                    JedisClusterHelper.set("ruleIndex" + data.getLong("id"), sumNumber);
+                    JedisClusterHelper.set("ruleIndex" + companyId + data.getLong("id"), sumNumber);
                 }
                 
                 StringBuilder builder =
@@ -316,8 +338,9 @@ public class FirstThread extends Thread
      * @param companyId
      * @param ruleId
      * @param model
+     * @param roleId
      */
-    private void commonJSON(JSONObject josn, Long companyId, List<Object> model)
+    private void commonJSON(JSONObject josn, Long companyId, List<Object> model, Long roleId)
     {
         int type = 1;
         Integer tmpType = josn.getInteger("type");
@@ -342,8 +365,8 @@ public class FirstThread extends Thread
                     .append(" where department_id in (")
                     .append(builder.toString())
                     .append(") and status = ")
-                    .append(Constant.CURRENCY_ZERO);
-                
+                    .append(Constant.CURRENCY_ZERO)
+                    .append("order by id desc ");
                 List<JSONObject> json = DAOUtil.executeQuery4JSON(queryBuilder.toString());
                 if (json != null && json.size() > 0)
                 {
@@ -356,7 +379,7 @@ public class FirstThread extends Thread
                         }
                     }
                 }
-                JedisClusterHelper.set("ruleId" + companyId, model);
+                JedisClusterHelper.set("ruleId" + companyId + roleId, model);
                 break;
             case Constant.CURRENCY_ONE:
                 StringBuilder selectbuilder = new StringBuilder("select * from employee_").append(companyId)
@@ -365,7 +388,8 @@ public class FirstThread extends Thread
                     .append(" and  del_status = ")
                     .append(Constant.CURRENCY_ZERO)
                     .append(" and  status = ")
-                    .append(Constant.CURRENCY_ZERO);
+                    .append(Constant.CURRENCY_ZERO)
+                    .append("order by id desc ");
                 JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(selectbuilder.toString());
                 if (null != jsonObject)
                 {
@@ -375,27 +399,42 @@ public class FirstThread extends Thread
                         model.add(jsonObject.getLong("id")); // 员工id
                     }
                 }
-                JedisClusterHelper.set("ruleId" + companyId, model);
+                JedisClusterHelper.set("ruleId" + companyId + roleId, model);
                 break;
             case Constant.CURRENCY_TWO:
-                Long[] id = moduleDataAuthAppService.getEmployeeIdByRole(companyId, josn.getInteger("id"));
-                if (null != id && id.length > 0)
+                StringBuilder roleBuilder = new StringBuilder();
+                roleBuilder.append(" select id  from employee_")
+                    .append(companyId)
+                    .append(" where role_id = ")
+                    .append(josn.getInteger("id"))
+                    .append(" and  del_status = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" and  status = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" order by id desc ");
+                List<JSONObject> jsonObjectList = DAOUtil.executeQuery4JSON(roleBuilder.toString());
+                if (!jsonObjectList.isEmpty())
                 {
-                    for (int i = 0; i < id.length; i++)
+                    
+                    for (int i = 0; i < jsonObjectList.size(); i++)
                     {
-                        boolean falg = commonDate(model, id[i]);
+                        boolean falg = commonDate(model, jsonObjectList.get(i).getLong("id"));
                         if (falg)
                         {
-                            model.add(id[i]); // 员工id
+                            model.add(jsonObjectList.get(i).getLong("id")); // 员工id
                         }
                     }
                 }
-                JedisClusterHelper.set("ruleId" + companyId, model);
+                
+                JedisClusterHelper.set("ruleId" + companyId + roleId, model);
                 break;
             case 4:
-                StringBuilder buf =
-                    new StringBuilder("select * from employee_").append(companyId).append(" where  del_status = ").append(Constant.CURRENCY_ZERO).append(" and  status = ").append(
-                        Constant.CURRENCY_ZERO);
+                StringBuilder buf = new StringBuilder("select * from employee_").append(companyId)
+                    .append(" where  del_status = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" and  status = ")
+                    .append(Constant.CURRENCY_ZERO)
+                    .append(" order by id desc");
                 List<JSONObject> jsonList = DAOUtil.executeQuery4JSON(buf.toString());
                 if (jsonList != null && jsonList.size() > 0)
                 {
@@ -408,7 +447,7 @@ public class FirstThread extends Thread
                         }
                     }
                 }
-                JedisClusterHelper.set("ruleId" + companyId, model);
+                JedisClusterHelper.set("ruleId" + companyId + roleId, model);
                 break;
             default:
                 break;

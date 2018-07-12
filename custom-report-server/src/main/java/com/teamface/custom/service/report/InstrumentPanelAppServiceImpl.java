@@ -99,7 +99,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
             {
                 String name = sourceName.replace(Constant.TYPE_AREA_DISTRICT, Constant.TYPE_AREA_CITY);
                 String asField = tmpXfields.getString("bean") + "_" + companyId + "_" + name;
-                asField = asField.replace("_approval_", "_");
+                asField = asField.replace("_approval_", "_").replace("_subform_", "_");
                 asField = asField.length() > 64 ? asField.substring(0, asField.lastIndexOf("subform")).concat(asField.substring(asField.lastIndexOf("_") + 1, asField.length()))
                     : asField;
                 xfields.add(asField);
@@ -107,13 +107,13 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
             if (sourceName.startsWith(Constant.TYPE_LOCATION) && tmpXfields.getString("format").equals("3") && isNeedCity)
             {
                 String asField = tmpXfields.getString("bean") + "_" + companyId + "_" + sourceName + "_" + Constant.TYPE_AREA_CITY;
-                asField = asField.replace("_approval_", "_");
+                asField = asField.replace("_approval_", "_").replace("_subform_", "_");
                 asField = asField.length() > 64 ? asField.substring(0, asField.lastIndexOf("subform")).concat(asField.substring(asField.lastIndexOf("_") + 1, asField.length()))
                     : asField;
                 xfields.add(asField);
             }
             String asField = tmpXfields.getString("bean") + "_" + companyId + "_" + sourceName;
-            asField = asField.replace("_approval_", "_");
+            asField = asField.replace("_approval_", "_").replace("_subform_", "_");
             asField =
                 asField.length() > 64 ? asField.substring(0, asField.lastIndexOf("subform")).concat(asField.substring(asField.lastIndexOf("_") + 1, asField.length())) : asField;
             xfields.add(asField);
@@ -143,7 +143,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
                         {
                             
                             String yname = tmpYfields.getString("bean") + "_" + companyId + "_" + englishname;
-                            yname = yname.replace("_approval_", "_");
+                            yname = yname.replace("_approval_", "_").replace("_subform_", "_");
                             yname =
                                 yname.length() > 64 ? yname.substring(0, yname.lastIndexOf("subform")).concat(yname.substring(yname.lastIndexOf("_") + 1, yname.length())) : yname;
                             yfields.add(yname);
@@ -166,6 +166,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
      * @return
      * @Description:
      */
+    @Override
     public JSONObject showLayout(String token, JSONObject layoutJson)
     {
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -196,6 +197,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
      * @return
      * @Description:
      */
+    @Override
     public JSONObject showLayoutForReport(String token, JSONObject layoutJson)
     {
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -234,6 +236,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
      * @return ServiceResult
      * @Description:运行单个仪表盘数据
      */
+    @Override
     public JSONObject showSingle(String token, JSONObject layoutJson, JSONArray seniorWhereArr, Long companyId)
     {
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -246,7 +249,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         JSONArray series = option.getJSONArray("series");
         JSONArray xAxis = new JSONArray();
         String type = layoutJson.getString("type");
-        if (type.equals("2") || type.equals("3"))
+        if ("2".equals(type) || "3".equals(type))
         {
             
             xAxis = option.getJSONArray("yAxis");
@@ -297,6 +300,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
                 option.put("name", numericalName.toString());
                 layoutJson.put("option", option);
                 return layoutJson;
+            default:
         }
         
         boolean isNeedCity = false;
@@ -330,12 +334,12 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
                     x1Obk.put("data", new JSONArray());
                 }
             }
-            if (type.equals("2") || type.equals("3"))
+            if ("2".equals(type) || "3".equals(type))
             {
                 
                 // option.put("xAxis", xAxis);
             }
-            else if (type.equals("0") || type.equals("1") || type.equals("4") || type.equals("12") || type.equals("13"))
+            else if ("0".equals(type) || "1".equals(type) || "4".equals(type) || "12".equals(type) || "13".equals(type))
             {
                 
             }
@@ -471,6 +475,8 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
                 option.put("xAxis", xAxis);
                 option.put("series", series);
                 layoutJson.put("option", option);
+                break;
+            default:
                 break;
         }
         
@@ -721,12 +727,15 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
                                 {
                                     JSONArray districtArray = cityDisMap.get(json.toString());
                                     JSONArray dArray = new JSONArray();
+                                    int index = y;
                                     for (Object dObj : districtArray)
                                     {
+                                        js = yjsonArray.get(index);
                                         JSONObject ddd = new JSONObject();
                                         ddd.put("label", dObj);
                                         ddd.put("value", js.toString());
                                         dArray.add(ddd);
+                                        index++;
                                     }
                                     obj.put("district", dArray);
                                     obj.put("value", js.toString());
@@ -1061,8 +1070,8 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         layoutJson.put("instrumentPanelId", String.valueOf(panelId));
         Document newdoc = new Document();
         newdoc.putAll(layoutJson);
-        String COLLECTION_NAME = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
-        LayoutUtil.saveDoc(newdoc, COLLECTION_NAME);
+        String collectionName = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
+        LayoutUtil.saveDoc(newdoc, collectionName);
         LOG.debug(" 仪表盘保存数据   end ： " + layoutJson.getString("title"));
         return serviceResult;
         
@@ -1079,15 +1088,15 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         for (Iterator itera = conditionArray.iterator(); itera.hasNext();)
         {
             JSONObject conditionObj = (JSONObject)itera.next();
-            Object field_value = conditionObj.get("field_value");
-            Object operator_value = conditionObj.get("operator_value");
-            Object result_value = conditionObj.get("result_value");
-            Object value_field = conditionObj.get("value_field");
+            Object fieldValue = conditionObj.get("field_value");
+            Object operatorValue = conditionObj.get("operator_value");
+            Object resultValue = conditionObj.get("result_value");
+            Object valueField = conditionObj.get("value_field");
             JSONObject obj = new JSONObject();
-            obj.put("fieldName", Constant.MAIN_TABLE_ALIAS + "." + field_value);
-            obj.put("operatorType", operator_value);
-            obj.put("value", result_value);
-            obj.put("valueField", value_field);
+            obj.put("fieldName", Constant.MAIN_TABLE_ALIAS + "." + fieldValue);
+            obj.put("operatorType", operatorValue);
+            obj.put("value", resultValue);
+            obj.put("valueField", valueField);
             array.add(obj);
         }
         
@@ -1103,9 +1112,9 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
             JSONObject submenuObj = new JSONObject();
             submenuObj.put("relevanceWhere", array);
             submenuObj.put("seniorWhere", seniorWhere);
-            String query_condition = JSONParser4SQL.getSeniorWhere4Relation(submenuObj);
-            query_condition = query_condition.replaceAll("'", Constant.VAR_QUOTES);
-            layoutJson.put("query_condition", query_condition);
+            String queryCondition = JSONParser4SQL.getSeniorWhere4Relation(submenuObj);
+            queryCondition = queryCondition.replaceAll("'", Constant.VAR_QUOTES);
+            layoutJson.put("query_condition", queryCondition);
             
         }
     }
@@ -1136,10 +1145,36 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         String updateSql = JSONParser4SQL.getUpdateSql(obj, companyId.toString());
         DAOUtil.executeUpdate(updateSql);
         String panelId = json.getString("panelId");
-        String COLLECTION_NAME = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
+        String collectionName = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
         Document doc = new Document();
+        JSONArray chartList = json.getJSONArray("chartList");
+        if (null != chartList)
+        {
+            
+            for (Object chart : chartList)
+            {
+                JSONObject chartJson = (JSONObject)chart;
+                JSONObject option = chartJson.getJSONObject("option");
+                if (null != option)
+                {
+                    
+                    JSONArray series = option.getJSONArray("series");
+                    if (null != series)
+                    {
+                        
+                        for (Object serie : series)
+                        {
+                            JSONObject seriesJson = (JSONObject)serie;
+                            seriesJson.put("data", new JSONArray());
+                        }
+                    }
+                    chartJson.put("series", series);
+                }
+            }
+        }
+        json.put("chartList", chartList);
         doc.putAll(json);
-        LayoutUtil.updateDoc(COLLECTION_NAME, panelId, doc);
+        LayoutUtil.updateDoc(collectionName, panelId, doc);
         LOG.debug(" 更新仪表盘数据  end ! ");
         return serviceResult;
         
@@ -1206,19 +1241,19 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         }
         LOG.debug(" 获取仪表盘列表  end ! ");
         List<JSONObject> moduleList = DAOUtil.executeQuery4JSON(builder.toString());
-        JSONObject first = new JSONObject();
-        first.put("id", 0);
-        first.put("name", "项目统计分析");
-        if (moduleList == null)
-        {
-            moduleList = new ArrayList<JSONObject>();
-            moduleList.add(first);
-            return moduleList;
-        }
-        List<JSONObject> moduleAllList = new ArrayList<>();
-        moduleAllList.add(first);
-        moduleAllList.addAll(moduleList);
-        return moduleAllList;
+        // JSONObject first = new JSONObject();
+        // first.put("id", 0);
+        // first.put("name", "项目统计分析");
+        // if (moduleList == null)
+        // {
+        // moduleList = new ArrayList<JSONObject>();
+        // moduleList.add(first);
+        // return moduleList;
+        // }
+        // List<JSONObject> moduleAllList = new ArrayList<>();
+        // moduleAllList.add(first);
+        // moduleAllList.addAll(moduleList);
+        return moduleList;
         
     }
     
@@ -1226,7 +1261,7 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
     public JSONObject findLayout(String token, String panelId)
     {
         LOG.debug(" 获取仪表盘布局  start ! " + panelId);
-        if (StringUtils.isEmpty(panelId))
+        if (StringUtils.isEmpty(panelId) || "0".equals(panelId))
         {
             return null;
         }
@@ -1235,8 +1270,8 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         Document doc = new Document();
         doc.put("companyId", companyId.toString());
         doc.put("instrumentPanelId", panelId);
-        String COLLECTION_NAME = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
-        Document result = LayoutUtil.findDocument(doc, COLLECTION_NAME);
+        String collectionName = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
+        Document result = LayoutUtil.findDocument(doc, collectionName);
         JSONObject json = JSONObject.parseObject(result.toJson());
         JSONArray chartArray = json.getJSONArray("chartList");
         JSONArray jsonArray = new JSONArray();
@@ -1295,14 +1330,14 @@ public class InstrumentPanelAppServiceImpl implements InstrumentPanelAppService
         doc.put("employeeId", employeeId.toString());
         doc.put("companyId", companyId.toString());
         doc.put("instrumentPanelId", panelId);
-        String COLLECTION_NAME = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
-        Document result = LayoutUtil.findDocument(doc, COLLECTION_NAME);
+        String collectionName = DAOUtil.getTableName(Constant.INSTRUMENT_PANEL_COLLECTION, companyId);
+        Document result = LayoutUtil.findDocument(doc, collectionName);
         if (result != null)
         {
             
             JSONObject json = JSONObject.parseObject(result.toJson());
             String layoutId = json.getJSONObject("_id").getString("$oid");
-            LayoutUtil.removeModuleSetLayout(layoutId, COLLECTION_NAME);
+            LayoutUtil.removeModuleSetLayout(layoutId, collectionName);
             
         }
         LOG.debug(" 删除仪表盘布局  end ! " + panelId);

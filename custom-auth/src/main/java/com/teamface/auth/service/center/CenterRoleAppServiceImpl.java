@@ -73,6 +73,7 @@ public class CenterRoleAppServiceImpl implements CenterRoleAppService
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
                 return serviceResult;
             }
+            
             Map<String, String> resultMap = new HashMap<>();
             resultMap.put("datetime_time", System.currentTimeMillis() + "");
             resultMap.put("token", token);
@@ -169,6 +170,16 @@ public class CenterRoleAppServiceImpl implements CenterRoleAppService
             JSONObject reqJson = JSONObject.parseObject(reqJsonStr);
             Integer roleId = reqJson.getInteger("role_id");
             
+            StringBuilder querySql = new StringBuilder();
+            querySql.append(" select count(1) from center_account where role_id = ");
+            querySql.append(roleId);
+            querySql.append(" and  del_status = ");
+            querySql.append(Constant.CURRENCY_ZERO);
+            int count = DAOUtil.executeCount(querySql.toString());
+            if(count>0) {
+                serviceResult.setCodeMsg(resultCode.get("common.role.user.childrole"), resultCode.getMsgZh("common.role.user.childrole"));
+                return serviceResult;
+            }
             String table = DAOUtil.getTableName("center_role", "");
             StringBuilder updateSql = new StringBuilder();
             updateSql.append("update ");

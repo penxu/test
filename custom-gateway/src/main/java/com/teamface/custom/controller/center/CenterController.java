@@ -556,7 +556,7 @@ public class CenterController
         try
         {
             JSONObject layoutJson = JSONObject.parseObject(reqJsonStr);
-            Object version = layoutJson.get("version");
+            Object edition = layoutJson.get("edition");
             Object startTime = layoutJson.get("start_time");
             Object endTime = layoutJson.get("end_time");
             Object industry = layoutJson.get("industry");
@@ -567,7 +567,7 @@ public class CenterController
             Object account = layoutJson.get("account");
             Object id = layoutJson.get("id");
             Map<String, Object> map = new HashMap<>();
-            map.put("version", version);
+            map.put("edition", edition);
             map.put("startTime", startTime);
             map.put("endTime", endTime);
             map.put("industry", industry);

@@ -35,7 +35,7 @@ import com.teamface.email.util.SqlOperationUtil;
 @Service("receiveRegulationService")
 public class ReceiveRegulationServiceImpl implements ReceiveRegulationService
 {
-    private static final MongoDBUtil mongoDB = MongoDBUtil.getInstance(Constant.DB_NAME);
+    private static final MongoDBUtil MONGO_DB = MongoDBUtil.getInstance(Constant.DB_NAME);
     
     @Autowired
     MailAccountService mailAccountService;
@@ -150,7 +150,7 @@ public class ReceiveRegulationServiceImpl implements ReceiveRegulationService
             .append(companyId)
             .append(" ma on mr.mail_account = ma.id where mr.employee_id =")
             .append(employeeId)
-            .append(" and mr.del_status = 0");
+            .append(" and mr.del_status = 0 order by mr.id");
         List<String> fields = new ArrayList<>();
         fields.add("transfer_to");
         fields.add("condition");
@@ -165,7 +165,7 @@ public class ReceiveRegulationServiceImpl implements ReceiveRegulationService
         Document queryDoc = new Document();
         queryDoc.put("type", "operator");
         // 查询数据
-        List<JSONObject> initArray = mongoDB.find4JSONObject(MailConstant.MAIL_SETTINGS_COLLECTION, queryDoc);
+        List<JSONObject> initArray = MONGO_DB.find4JSONObject(MailConstant.MAIL_SETTINGS_COLLECTION, queryDoc);
         result.put("accountInfo", accountInfo);
         result.put("initData", initArray);
         return JsonResUtil.getSuccessJsonObject(result);

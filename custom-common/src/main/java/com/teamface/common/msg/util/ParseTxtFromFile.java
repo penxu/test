@@ -79,18 +79,25 @@ public class ParseTxtFromFile
         for (int i = 0; i < 3; ++i)
         {
             if (b[3 - i] >= 0)
+            {
                 s = s + b[3 - i];
+            }
             else
+            {
                 s = s + 256 + b[3 - i];
-                
+            }
             s = s * 256;
         }
         
         if (b[0] >= 0)
+        {
             s = s + b[0];
+        }
         else
+        {
             s = s + 256 + b[0];
-            
+        }
+        
         return s;
     }
     
@@ -99,16 +106,25 @@ public class ParseTxtFromFile
     {
         int s = 0;
         if (b[1] >= 0)
+        {
             s = s + b[1];
+        }
         else
+        {
             s = s + 256 + b[1];
+        }
+        
         s = s * 256;
         
         if (b[0] >= 0)
+        {
             s = s + b[0];
+        }
         else
+        {
             s = s + 256 + b[0];
-            
+        }
+        
         short result = (short)s;
         return result;
     }
@@ -119,17 +135,26 @@ public class ParseTxtFromFile
         for (int i = 0; i < 7; ++i)
         {
             if (b[7 - i] >= 0)
+            {
                 s = s + b[7 - i];
+            }
             else
+            {
                 s = s + 256 + b[7 - i];
-                
+            }
+            
             s = s * 256;
         }
         
         if (b[0] >= 0)
+        {
             s = s + b[0];
+        }
         else
+        {
             s = s + 256 + b[0];
+        }
+        
         return s;
     }
     

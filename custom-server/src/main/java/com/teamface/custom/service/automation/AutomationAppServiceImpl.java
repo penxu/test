@@ -58,7 +58,8 @@ public class AutomationAppServiceImpl implements AutomationAppService
             queryCountBuilder.append(jsonObject.getString("title").replace("'", "''"));
             queryCountBuilder.append("'  and  bean = '");
             queryCountBuilder.append(jsonObject.getString("bean"));
-            queryCountBuilder.append("'");
+            queryCountBuilder.append("'  and del_status = ");
+            queryCountBuilder.append(Constant.CURRENCY_ZERO);
             int count = DAOUtil.executeCount(queryCountBuilder.toString());
             if(count>0) {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), "规则名称已存在");
@@ -305,6 +306,8 @@ public class AutomationAppServiceImpl implements AutomationAppService
             queryCountBuilder.append("'");
             queryCountBuilder.append("  and  id != ");
             queryCountBuilder.append(jsonObject.getLong("id"));
+            queryCountBuilder.append("  and del_status = ");
+            queryCountBuilder.append(Constant.CURRENCY_ZERO);
             int number = DAOUtil.executeCount(queryCountBuilder.toString());
             if(number>0) {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), "规则名称已存在");

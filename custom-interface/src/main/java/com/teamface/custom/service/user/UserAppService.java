@@ -318,5 +318,13 @@ public interface UserAppService {
 	 * @return
 	 */
 	ServiceResult<String> vailCompanyIp(Map<String, String> map);
+	
+	/**
+	 * 获取公司banner图片
+	* @param token
+	* @return
+	* @Description:
+	 */
+    JSONObject queryCompanyBanner(String token);
 
 }

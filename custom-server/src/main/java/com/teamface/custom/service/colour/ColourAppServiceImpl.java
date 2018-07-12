@@ -120,7 +120,8 @@ public class ColourAppServiceImpl implements ColourAppService
             queryCountBuilder.append(reqJson.getString("title").replace("'", "''"));
             queryCountBuilder.append("'  and  bean = '");
             queryCountBuilder.append(reqJson.getString("bean"));
-            queryCountBuilder.append("'");
+            queryCountBuilder.append("'  and status = ");
+            queryCountBuilder.append(Constant.CURRENCY_ZERO);
             int count = DAOUtil.executeCount(queryCountBuilder.toString());
             if(count>0) {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), "规则名称已存在");
@@ -229,6 +230,8 @@ public class ColourAppServiceImpl implements ColourAppService
             queryCountBuilder.append("'");
             queryCountBuilder.append("  and  id != ");
             queryCountBuilder.append(dataJson.getLong("id"));
+            queryCountBuilder.append("  and status = ");
+            queryCountBuilder.append(Constant.CURRENCY_ZERO);
             int count = DAOUtil.executeCount(queryCountBuilder.toString());
             if(count>0) {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), "规则名称已存在");

@@ -5,6 +5,8 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.log4j.Logger;
+
 import com.sun.org.apache.xerces.internal.impl.dv.util.Base64;
 
 import io.jsonwebtoken.Claims;
@@ -16,6 +18,8 @@ import io.jsonwebtoken.SignatureException;
 
 public class TokenMgr
 {
+    
+    private static Logger log = Logger.getLogger(TokenMgr.class);
     
     public static SecretKey generalKey()
     {
@@ -92,25 +96,12 @@ public class TokenMgr
     
     public static InfoVo obtainInfo(String jwt)
     {
+        log.info("生成TOKEN".concat(jwt));
         SecretKey secretKey = generalKey();
         Claims claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(jwt).getBody();
         InfoVo info = new InfoVo(claims.getId() == null ? null : Long.parseLong(claims.getId()), claims.getSubject() == null ? null : Long.parseLong(claims.getSubject()),
             claims.getAudience() == null ? null : Long.parseLong(claims.getAudience()), claims.getIssuer() == null ? null : Long.parseLong(claims.getIssuer()));
         return info;
-    }
-    
-    public static void main(String[] args)
-        throws Exception
-    {
-        createJWT("1", "1", "1", "1", -1);
-
-        InfoVo info = TokenMgr.obtainInfo(
-            "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyMSIsInN1YiI6IjEiLCJhdWQiOiIxMyIsImlzcyI6IjEwMDIzIiwiaWF0IjoxNTI2OTcwOTA0fQ.fq26nc3lZ8hXf4AYwzQzvC68QzmFAm4ls1Dv3CYPoKg");
-        System.out.println(info.getAccountId());
-        System.out.println(info.getCompanyId());
-        System.out.println(info.getEmployeeId());
-        System.out.println(info.getSignId());
-        
     }
     
 }

@@ -17,7 +17,7 @@ public class HttpRequstUtil
      * @return
      * @Description:URL解析
      */
-    public static Map<String, String> URLRequest(String url)
+    public static Map<String, String> urlRequest(String url)
     {
         Map<String, String> mapRequest = new HashMap<String, String>();
         String[] arrSplit = null;

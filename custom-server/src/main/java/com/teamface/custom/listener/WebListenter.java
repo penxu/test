@@ -8,6 +8,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import com.teamface.common.cache.CacheSimpleManger;
+import com.teamface.custom.service.Thread.FirstThread;
 
 public class WebListenter implements ServletContextListener
 {
@@ -26,7 +27,8 @@ public class WebListenter implements ServletContextListener
         {
             LOG.debug("WebListenter contextInitialized(ServletContextEvent event) start");
         }
-
+        Thread  thread = new Thread(new FirstThread(),"Automation  FirstThread");
+        thread.start();
         cacheLoad();
         if (LOG.isDebugEnabled())
         {

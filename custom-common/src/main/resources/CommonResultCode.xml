@@ -76,8 +76,12 @@
 		<item ident="account.examine.susses" pre="1" code="152" msgZh="账号已提交审核,请稍后" msgEn=""/>
 		<item ident="account.error" pre="1" code="153" msgZh="账号不存在" msgEn=""/>
 		<item ident="seapool.name.is.exist" pre="1" code="154" msgZh="公海池名称已经存在" msgEn=""/>
-		<item ident="upload.file.auth.error" pre="1" code="155" msgZh="没有权限执行此操作" msgEn=""/>
 		<item ident="user.role.has.childrole" pre="1" code="155" msgZh="当前分组下存在角色名称，请删除角色名称后再删除分组。" msgEn=""/>
-
+		<item ident="upload.file.auth.error" pre="1" code="156" msgZh="没有权限执行此操作" msgEn=""/>
+	    <item ident="register.user.existence" pre="1" code="157" msgZh="当前手机号已被注册" msgEn=""/>
+	    <item ident="role.user.childrole" pre="1" code="158" msgZh="当前角色下还有员工" msgEn=""/>
+	    <item ident="center_account.error" pre="1" code="159" msgZh="该账号已被禁用" msgEn=""/>
+		<item ident="submenu.name.is.exist" pre="1" code="160" msgZh="子菜单名称重复" msgEn=""/>
+		<item ident="transform.name.is.exist" pre="1" code="161" msgZh="名称不能重复，请重新输入!" msgEn=""/>
 	</type>
 </service-code>

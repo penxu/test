@@ -40,7 +40,7 @@ public class TestInitCompanyTables
     {
         Connection con = null;
         String driver = "org.postgresql.Driver";
-        String url = "jdbc:postgresql://192.168.1.223:5432/custom_test";
+        String url = "jdbc:postgresql://192.168.1.173:5432/custom_test3";
         String user = "hjhq";
         String password = "hjhq123";
         try
@@ -157,7 +157,7 @@ public class TestInitCompanyTables
         .append("CONSTRAINT employee_fabulous_")
         .append(companyId)
         .append("_pkey PRIMARY KEY (id));");
-    DAOUtil.executeUpdate(sqlSB.toString());
+        executeUpdate(sqlSB.toString());
     }
     
     @Transactional
@@ -189,13 +189,13 @@ public class TestInitCompanyTables
                 }
                 log.error("company-tables created!");
                 
-                // 添加字段注释
+               /* // 添加字段注释
                 ClassPathResource indexrc = new ClassPathResource("execute/company-index.sql");
                 File indexfile = indexrc.getFile();
                 List<String> indexsqls = FileUtil.readFile(indexfile, ";", "utf-8");
                 CreateTable cit = new CreateTable(company, indexsqls);
                 cit.start();
-                log.error("company-index created!");
+                log.error("company-index created!");*/
                 
                 // 流程表
                 ClassPathResource prc = new ClassPathResource("execute/process-constraint.sql");
@@ -245,9 +245,9 @@ public class TestInitCompanyTables
                 sqlSB.append("INSERT INTO project_management_priviledge_" + company + " VALUES (nextval('project_management_priviledge_" + company + "_id_seq'::regclass), '添加文件夹');");
                 sqlSB.append("INSERT INTO project_management_priviledge_" + company + " VALUES (nextval('project_management_priviledge_" + company + "_id_seq'::regclass), '编辑文件夹');");
                 sqlSB.append("INSERT INTO project_management_priviledge_" + company + " VALUES (nextval('project_management_priviledge_" + company + "_id_seq'::regclass), '删除文件');");
-                DAOUtil.executeUpdate(sqlSB.toString());
-                
-                while (cit.isAlive() || pct.isAlive())
+                executeUpdate(sqlSB.toString());
+                //cit.isAlive() ||
+                while ( pct.isAlive())
                 {
                     sleep(100);
                 }

@@ -427,11 +427,10 @@ public interface FileLibraryAppService
      * 
      * @param token
      * @param id
-     * @param type 类型 0 上传 1 下载
      * @return
      * @Description:
      */
-    public boolean vailFileAuth(String token, Long id, int type);
+    public boolean vailFileAuth(String token, Long id);
     
     /**
      * 验证邮件选文件库文件权限
@@ -441,4 +440,14 @@ public interface FileLibraryAppService
      * @Description:
      */
     public JSONObject queryEmailFileAuth(Map<String, String> map);
+    
+    /**
+     * 验证上传是否拥有权限
+     * 
+     * @param token
+     * @param id
+     * @return
+     * @Description:
+     */
+    public boolean vailFileUploadAuth(String token, Long id, String style);
 }

@@ -7,9 +7,9 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.springframework.util.SerializationUtils;
 
 import com.teamface.common.constant.Constant;
+import com.teamface.common.util.SerializableUtils;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -29,25 +29,8 @@ public class JedisClusterHelper
     
     private static JedisPool jedisPool = null;
     
-    static
+    private JedisClusterHelper()
     {
-        try
-        {
-            JedisPoolConfig config = new JedisPoolConfig();
-            config.setMaxIdle(Constant.REDIS_MAX_IDLE);
-            config.setMaxTotal(Constant.REDIS_MAX_TOTAL);
-            config.setTestOnBorrow(Constant.REDIS_TEST_ON_BORROW == 1);
-            config.setTestOnReturn(Constant.REDIS_TEST_ON_RETURN == 1);
-            String host = Constant.REDIS_HOST;
-            String password = Constant.REDIS_PASSWORD;
-            int port = Constant.REDIS_PORT;
-            int timeout = Constant.REDIS_TIMEOUT;
-            jedisPool = new JedisPool(config, host, port, timeout, password);
-        }
-        catch (Exception e)
-        {
-            log.error(e.getMessage(), e);
-        }
         
     }
     
@@ -168,7 +151,7 @@ public class JedisClusterHelper
             jedis = getJedis();
             if (jedis != null)
             {
-                jedis.set((Constant.REDIS_KEY_SUFFIX + key).getBytes(), SerializationUtils.serialize(value));
+                jedis.set((Constant.REDIS_KEY_SUFFIX + key).getBytes(), SerializableUtils.serialize(value));
             }
         }
         catch (Exception e)
@@ -189,7 +172,7 @@ public class JedisClusterHelper
             jedis = getJedis();
             if (jedis != null)
             {
-                jedis.setex((Constant.REDIS_KEY_SUFFIX + key).getBytes(), seconds, SerializationUtils.serialize(value));
+                jedis.setex((Constant.REDIS_KEY_SUFFIX + key).getBytes(), seconds, SerializableUtils.serialize(value));
             }
         }
         catch (Exception e)
@@ -733,7 +716,7 @@ public class JedisClusterHelper
             jedis = getJedis();
             if (jedis != null)
             {
-                value = SerializationUtils.deserialize(jedis.get((Constant.REDIS_KEY_SUFFIX + key).getBytes()));
+                value = SerializableUtils.deserialize(jedis.get((Constant.REDIS_KEY_SUFFIX + key).getBytes()));
             }
         }
         catch (Exception e)
@@ -773,6 +756,10 @@ public class JedisClusterHelper
     private static synchronized Jedis getJedis()
     {
         Jedis jedis = null;
+        if (jedisPool == null)
+        {
+            initPool();
+        }
         if (jedisPool != null)
         {
             for (int i = 0; i < Constant.REDIS_MAX_ATTEMPTS; i++)
@@ -810,6 +797,28 @@ public class JedisClusterHelper
             {
                 log.error(e.getMessage(), e);
             }
+        }
+    }
+    
+    private static synchronized void initPool()
+    {
+        try
+        {
+            JedisPoolConfig config = new JedisPoolConfig();
+            config.setMaxIdle(Constant.REDIS_MAX_IDLE);
+            config.setMaxTotal(Constant.REDIS_MAX_TOTAL);
+            config.setTestOnBorrow(Constant.REDIS_TEST_ON_BORROW == 1);
+            config.setTestOnReturn(Constant.REDIS_TEST_ON_RETURN == 1);
+            
+            String host = Constant.REDIS_HOST;
+            String password = Constant.REDIS_PASSWORD;
+            int port = Constant.REDIS_PORT;
+            int timeout = Constant.REDIS_TIMEOUT;
+            jedisPool = new JedisPool(config, host, port, timeout, password);
+        }
+        catch (Exception e)
+        {
+            log.error(e.getMessage(), e);
         }
     }
 }

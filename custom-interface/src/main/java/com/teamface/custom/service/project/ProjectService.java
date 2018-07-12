@@ -183,6 +183,25 @@ public interface ProjectService
      * @return
      * @Description:获取项目列表详情
      */
-    public List<JSONObject> queryProjectDetails(Map<String, String> paramMap);
+    public JSONObject queryProjectDetails(Map<String, String> paramMap);
+    
+    /**
+     * 
+     * @param token
+     * @param requestStr
+     * @return
+     * @Description:更新项目星标信息
+     */
+    public ServiceResult<String> updateProjectAsterisk(String token, String requestStr);
+    
+    /**
+     * 
+     * @param token
+     * @param requestStr
+     * @return
+     * @Description:更新项目星标信息
+     */
+    public ServiceResult<String> updateProjectVisualRange(String token, String requestStr);
+    
     
 }

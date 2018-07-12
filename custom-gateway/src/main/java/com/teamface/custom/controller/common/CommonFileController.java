@@ -18,11 +18,13 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -42,6 +44,8 @@ import com.teamface.common.exception.ServiceException;
 import com.teamface.common.file.FileUtil;
 import com.teamface.common.msg.util.ParseTxtFromFile;
 import com.teamface.common.util.ExcelUtil;
+import com.teamface.common.util.FfmpegUtil;
+import com.teamface.common.util.FileDaoUtil;
 import com.teamface.common.util.JsonResUtil;
 import com.teamface.common.util.PropertiesConfigObject;
 import com.teamface.common.util.StringUtil;
@@ -49,6 +53,7 @@ import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.common.util.dao.LayoutUtil;
 import com.teamface.common.util.dao.LibraryDownloadPatchFilesUtil;
 import com.teamface.common.util.dao.OSSUtil;
+import com.teamface.common.util.dao.Office2Pdf;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
 import com.teamface.custom.service.employee.EmployeeAppService;
@@ -76,6 +81,22 @@ public class CommonFileController
     
     @Autowired
     private FileLibraryAppService fileLibraryAppService;
+    
+    PropertiesConfigObject properties = PropertiesConfigObject.getInstance();
+    
+    Configuration config = properties.getConfig();
+    
+    String ffmpegUrl = config.getString("ffmpeg.linux.url");
+    
+    String fileUrl = config.getString("teamface.file.url");
+    
+    String pdfFileWindowTempUrl = config.getString("teamface.download.window.pdfdir");
+    
+    String pdfFileLinuxTempUrl = config.getString("teamface.download.linux.pdfdir");
+    
+    String vedioFileUrl = config.getString("teamface.openmovie.url");
+    
+    String imageFileUrl = config.getString("teamface.imagefile.url");
     
     /**
      * 公司初始化头像上传
@@ -145,7 +166,7 @@ public class CommonFileController
     @RequestMapping(value = "/common/file/upload", method = RequestMethod.POST)
     public @ResponseBody JSONObject fileUpload(HttpServletRequest request, @RequestParam(value = "bean", required = true) String bean,
         @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    
     {
         JSONArray resultArray = new JSONArray();
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
@@ -204,7 +225,7 @@ public class CommonFileController
     public @ResponseBody JSONObject applyFileUpload(HttpServletRequest request, @RequestParam(value = "bean", required = true) String bean,
         @RequestParam(value = "data_id", required = false) String data_id, @RequestParam(value = "file_size", required = false) String file_size,
         @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    
     {
         JSONArray resultArray = new JSONArray();
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
@@ -238,7 +259,7 @@ public class CommonFileController
                 }
                 if (!"".equals(file_size) && null != file_size)
                 {
-                    if (file.getSize() >= Long.valueOf(file_size))
+                    if (file.getSize() > Long.valueOf(file_size))
                     {
                         return JsonResUtil.getResultJsonByIdent("common.upload.file.size.error");
                     }
@@ -267,16 +288,19 @@ public class CommonFileController
     public @ResponseBody JSONObject FileLibraryUpload(HttpServletRequest request, @RequestParam(value = "url", required = true) String url,
         @RequestParam(value = "id", required = true) String id, @RequestParam(value = "style", required = true) String style,
         @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    
     {
         LOG.debug("进入上传方法=====================================");
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
         try
         {
-            boolean flag = fileLibraryAppService.vailFileAuth(token, Long.valueOf(id), Constant.CURRENCY_ZERO);
-            if (!flag)
+            if (Integer.parseInt(style) == Constant.CURRENCY_ONE)
             {
-                return JsonResUtil.getResultJsonByIdent("common.upload.file.auth.error");
+                boolean flag = fileLibraryAppService.vailFileUploadAuth(token, Long.valueOf(id), style);
+                if (!flag)
+                {
+                    return JsonResUtil.getResultJsonByIdent("common.upload.file.auth.error");
+                }
             }
             CommonsMultipartResolver multipartResolver = new CommonsMultipartResolver(request.getSession().getServletContext());
             // 检查form中是否有enctype="multipart/form-data"
@@ -332,7 +356,7 @@ public class CommonFileController
     public @ResponseBody JSONObject fileVersionUpload(HttpServletRequest request, @RequestParam(value = "url", required = true) String url,
         @RequestParam(value = "id", required = true) String id, @RequestParam(value = "style", required = true) String style,
         @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    
     {
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
         try
@@ -397,7 +421,12 @@ public class CommonFileController
                 attachmentJson.put("fileType", postfix.toLowerCase());// 文件后缀，全部小写
                 attachmentJson.put("fileSize", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serialNumber", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
-                falge = OSSUtil.getInstance().uploadFileVersionFile(file.getInputStream(), id, url, fileNameNew, file.getSize(), token, type);
+                String fileUrlPath = FileDaoUtil.uploadFileVersionFile(id, url, fileNameNew, file.getSize(), token, type);
+                if (StringUtils.isEmpty(fileUrlPath))
+                {
+                    return false;
+                }
+                falge = OSSUtil.getInstance().addFile(Constant.FLIE_LIBRARY_NAME, file.getInputStream(), file.getSize(), fileUrlPath);
             }
         }
         catch (Exception e)
@@ -446,12 +475,53 @@ public class CommonFileController
                 attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
                 LOG.debug("oss链接=====================================");
-                falge = OSSUtil.getInstance().savaFileLibraryFile(file.getInputStream(), id, url, fileNameNew, file.getSize(), token, type);
+                StringBuilder ids = new StringBuilder();
+                String fileUrlPath = FileDaoUtil.savaFileLibraryFile(id, url, fileNameNew, file.getSize(), token, type, ids);
+                if (StringUtils.isEmpty(fileUrlPath))
+                {
+                    return false;
+                }
+                
+                falge = OSSUtil.getInstance().addFile(Constant.FLIE_LIBRARY_NAME, file.getInputStream(), file.getSize(), fileUrlPath);
+                
+                if (falge)
+                {
+                    // .txt .pdf .xls xlsx docx doc dot pptx ppt
+                    if (postfix.equals("txt") || postfix.equals("pdf") || postfix.equals("xls") || postfix.equals("xlsx") || postfix.equals("docx") || postfix.equals("doc")
+                        || postfix.equals("dot") || postfix.equals("pptx") || postfix.equals("ppt"))
+                    {
+                        
+                        String OS = System.getProperty("os.name").toLowerCase();
+                        String strDirPath = "";
+                        if (OS.indexOf("linux") >= 0)
+                        {
+                            strDirPath = pdfFileLinuxTempUrl + "/";
+                        }
+                        else
+                        {
+                            strDirPath = pdfFileWindowTempUrl + "//";
+                        }
+                        String upFilePath = strDirPath + fileUrlPath;
+                        LOG.debug(" 转为pdf文件：fileName = " + fileUrlPath + " filePath = " + upFilePath);
+                        File movieFile = new File(upFilePath);
+                        FileUtils.copyInputStreamToFile(file.getInputStream(), movieFile);
+                        String pdfName = Office2Pdf.getOutputFilePath(fileUrlPath);
+                        Office2Pdf.word2pdf(upFilePath);
+                        OSSUtil.getInstance().addFile(Constant.FLIE_LIBRARY_NAME, movieFile);
+                        if (falge)
+                        {
+                            
+                            FileDaoUtil.updatePDFUrlByTransfor(ids.toString(), pdfName, token);
+                            deleteDir(new File(strDirPath));
+                        }
+                    }
+                    
+                }
             }
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage(), e);
+            LOG.error(" 文件库文件上传 异常  " + e.getMessage(), e);
             try
             {
                 throw new ServiceException(e);
@@ -464,6 +534,29 @@ public class CommonFileController
         return falge;
     }
     
+    /**
+     * 
+     * @param dir
+     * @return
+     * @Description:删除目录下所有文件
+     */
+    private boolean deleteDir(File dir)
+    {
+        if (dir.isDirectory())
+        {
+            String[] children = dir.list();// 递归删除目录中的子目录下
+            for (int i = 0; i < children.length; i++)
+            {
+                boolean success = deleteDir(new File(dir, children[i]));
+                if (!success)
+                {
+                    return false;
+                }
+            }
+        }
+        return dir.delete();
+    }
+    
     private JSONArray uploadApplyFile(String beanName, List<MultipartFile> fileList, String token, String data_id)
         throws ServiceException
     {
@@ -474,7 +567,6 @@ public class CommonFileController
             for (MultipartFile file : fileList)
             {
                 String fileNameNew = file.getOriginalFilename();
-                String contentType = file.getContentType();
                 String postfix = fileNameNew.substring(fileNameNew.lastIndexOf(".") + 1);
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
@@ -495,20 +587,18 @@ public class CommonFileController
                 map.put("bean", beanName);
                 String applyId = moduleAppService.getModuleBelongWhichApp(map);
                 
-                String sql = "select * from application_module_" + info.getCompanyId() + " where english_name = '" + beanName + "'";
-                JSONObject jsonObject = DAOUtil.executeQuery4FirstJSON(sql);
-                String fileUrl = OSSUtil.getInstance().addApplyFile(file.getInputStream(),
-                    beanName,
-                    file.getOriginalFilename(),
-                    file.getSize(),
-                    contentType,
-                    applyId,
-                    token,
-                    jsonObject.getString("id"),
-                    data_id);
+                String fileUrlPath = FileDaoUtil.addApplyFile(beanName, file.getOriginalFilename(), file.getSize(), applyId, token, data_id);
+                if (StringUtils.isEmpty(fileUrlPath))
+                {
+                    return null;
+                }
+                
+                String fileUrl = OSSUtil.getInstance().addFile(Constant.FLIE_LIBRARY_NAME, file.getInputStream(), fileUrlPath, file.getSize());
                 if (!StringUtils.isEmpty(fileUrl))
                 {// 有可能会上传失败！
-                    attachmentJson.put("file_url", fileUrl);
+                    String filePathUrl = config.getString("teamface.file.url");
+                    filePathUrl = filePathUrl.concat("bean=").concat(beanName).concat("&fileName=").concat(fileUrlPath);
+                    attachmentJson.put("file_url", filePathUrl);
                 }
                 else
                 {
@@ -521,7 +611,6 @@ public class CommonFileController
         catch (Exception e)
         {
             LOG.error(e.getMessage(), e);
-            e.printStackTrace();
             throw new ServiceException(e);
         }
         return resultArray;
@@ -574,7 +663,16 @@ public class CommonFileController
             String token = StringUtil.isEmpty(token1) ? token2 : token1;
             InfoVo info = TokenMgr.obtainInfo(token);
             Long companyId = info.getCompanyId();
-            is = OSSUtil.getInstance().getletterFile(buckName, fileName, width, height);
+            if (width != null && height != null)
+            {
+                
+                is = OSSUtil.getInstance().getCompressedFile(buckName, fileName, width, height);
+            }
+            else
+            {
+                is = OSSUtil.getInstance().getFile(buckName, fileName);
+                
+            }
             fos = new BufferedInputStream(is);
             os = response.getOutputStream();
             
@@ -835,39 +933,75 @@ public class CommonFileController
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
                 serialNumber++;
+                long fileSize = file.getSize();
                 JSONObject attachmentJson = new JSONObject();
                 attachmentJson.put("original_file_name", fileNameNew);
                 attachmentJson.put("file_name", fileNameNew);
                 attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
-                attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
+                attachmentJson.put("file_size", fileSize);// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
                 JSONObject employee = employeeAppService.queryEmployee(employeeId, companyId);
                 attachmentJson.put("upload_by", employee.get("employee_name") == null ? "" : employee.get("employee_name"));
                 attachmentJson.put("upload_time", System.currentTimeMillis());
-                Map<String, String> fileUrlMap = OSSUtil.getInstance().addFile(buckName, file, beanName, fileNameNew, file.getSize(), contentType, companyId, request);
-                if (fileUrlMap.containsKey("fileUrl"))
-                {// 有可能会上传失败！
-                    attachmentJson.put("file_url", fileUrlMap.get("fileUrl"));
-                    if (!StringUtils.isEmpty(contentType) && (contentType.startsWith("audio") || contentType.startsWith("video")))
+                InputStream content = file.getInputStream();
+                InputStream inputContent = file.getInputStream();
+                String keyString = OSSUtil.getInstance().addFile(buckName, content, fileNameNew, fileSize);
+                
+                if (!StringUtils.isEmpty(contentType) && (contentType.startsWith("audio") || contentType.startsWith("video")))
+                {
+                    String url = vedioFileUrl + "bean=" + beanName + "&fileName=" + keyString + "&contentType=" + contentType + "&fileSize=" + fileSize;
+                    attachmentJson.put("file_url", url);
+                    // String strDirPath =
+                    // request.getSession().getServletContext().getRealPath("/");
+                    String strDirPath = CommonFileController.class.getResource("/").getPath();
+                    String upFilePath = strDirPath + File.separator + keyString;
+                    File movieFile = new File(upFilePath);
+                    FileUtils.copyInputStreamToFile(inputContent, movieFile);
+                    String imageMat = "png";
+                    keyString = keyString.substring(0, keyString.lastIndexOf("."));
+                    keyString += "." + imageMat;
+                    String mediaPicPath = strDirPath + File.separator + keyString;
+                    String OS = System.getProperty("os.name").toLowerCase();
+                    String ffmpegPath = "";
+                    
+                    if (OS.indexOf("linux") >= 0)
                     {
-                        if (fileUrlMap.containsKey("video_thumbnail_url"))
-                        {
-                            attachmentJson.put("video_thumbnail_url", fileUrlMap.get("video_thumbnail_url"));
-                        }
+                        ffmpegPath = ffmpegUrl;
                     }
-                    else if (!StringUtils.isEmpty(contentType) && contentType.startsWith("image/jpeg"))
+                    else
                     {
-                        if (fileUrlMap.containsKey("image_thumbnail_url"))
-                        {
-                            attachmentJson.put("image_thumbnail_url", fileUrlMap.get("image_thumbnail_url"));
-                        }
+                        ffmpegPath = strDirPath + "//ffmpeg//bin//ffmpeg.exe";
                     }
+                    // 截图配置调用
+                    FfmpegUtil.process(ffmpegPath, upFilePath, mediaPicPath);
+                    File picfile = new File(mediaPicPath);
+                    String thum_url = "";
+                    String thum_key = "";
+                    if (picfile.exists())
+                    {
+                        thum_key = OSSUtil.getInstance().addFile(buckName, picfile);
+                        thum_url = fileUrl + "bean=" + beanName + "&fileName=" + thum_key + "&fileSize=" + movieFile.length();
+                        picfile.delete();
+                    }
+                    else
+                    {
+                        picfile.createNewFile();
+                        thum_key = OSSUtil.getInstance().addFile(buckName, picfile);
+                        thum_url = fileUrl + "bean=" + beanName + "&fileName=" + thum_key + "&fileSize=" + movieFile.length();
+                        picfile.delete();
+                    }
+                    File upFile = new File(upFilePath);
+                    if (upFile.exists())
+                    {
+                        upFile.delete();
+                    }
+                    attachmentJson.put("video_thumbnail_url", thum_url);
                     
                 }
                 else
                 {
-                    ServiceException serviceException = new ServiceException(resultCode.get("common.upload.file.interrupt"), resultCode.getMsgZh("common.upload.file.interrupt"));
-                    throw serviceException;
+                    String url = fileUrl + "bean=" + beanName + "&fileName=" + keyString + "&fileSize=" + fileSize;
+                    attachmentJson.put("file_url", url);
                 }
                 resultArray.add(attachmentJson);
             }
@@ -894,7 +1028,6 @@ public class CommonFileController
             for (MultipartFile file : fileList)
             {
                 String fileNameNew = file.getOriginalFilename();
-                String contentType = file.getContentType();
                 String postfix = fileNameNew.substring(fileNameNew.lastIndexOf(".") + 1);
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
@@ -905,16 +1038,9 @@ public class CommonFileController
                 attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
                 attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
-                String fileUrl = OSSUtil.getInstance().addImageFile(buckName, file.getInputStream(), beanName, fileNameNew, file.getSize(), contentType, accountId);
-                if (!StringUtils.isEmpty(fileUrl))
-                {// 有可能会上传失败！
-                    attachmentJson.put("file_url", fileUrl);
-                }
-                else
-                {
-                    ServiceException serviceException = new ServiceException(resultCode.get("common.upload.file.interrupt"), resultCode.getMsgZh("common.upload.file.interrupt"));
-                    throw serviceException;
-                }
+                String key = OSSUtil.getInstance().addFile(buckName, file.getInputStream(), fileNameNew, file.getSize());
+                String fileUrl = imageFileUrl + "bean=" + beanName + "&fileName=" + key + "&fileSize=" + file.getSize();
+                attachmentJson.put("file_url", fileUrl);
                 resultArray.add(attachmentJson);
             }
         }
@@ -926,7 +1052,7 @@ public class CommonFileController
     }
     
     @RequestMapping(value = "/library/file/batchDownload", method = RequestMethod.GET)
-    public void batchDownload(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
+    public JSONObject batchDownload(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
         @RequestParam(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenPara,
         @RequestHeader(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenHeader)
     {
@@ -939,13 +1065,20 @@ public class CommonFileController
         {
             if (StringUtil.isEmpty(tokenPara) && StringUtil.isEmpty(tokenHeader))
             {
-                return;
+                return JsonResUtil.getFailJsonObject();
             }
             String token = StringUtil.isEmpty(tokenPara) ? tokenHeader : tokenPara;
             InfoVo info = TokenMgr.obtainInfo(token);
             Long companyId = info.getCompanyId();
+            Long employeeId = info.getEmployeeId();
+            // 添加文件夹下载权限
+            boolean flag = fileLibraryAppService.vailFileAuth(token, id);
+            if (!flag)
+            {
+                return JsonResUtil.getFailJsonObject();
+            }
             response.setCharacterEncoding("UTF-8");
-            filePath = LibraryDownloadPatchFilesUtil.getInstance().getAllCompressedFiles(companyId, id);
+            filePath = LibraryDownloadPatchFilesUtil.getInstance().getAllCompressedFiles(companyId, employeeId, id);
             String fileName = filePath.substring(filePath.lastIndexOf("/") + 1);
             response.setHeader("content-disposition", "attachment;filename=" + URLEncoder.encode(fileName));
             
@@ -986,7 +1119,7 @@ public class CommonFileController
                     
                     os.close();
                 }
-                if (downloadFile.isFile())
+                if (null != downloadFile && downloadFile.isFile())
                 {
                     downloadFile.delete();
                 }
@@ -997,10 +1130,11 @@ public class CommonFileController
             }
             
         }
+        return JsonResUtil.getSuccessJsonObject();
     }
     
     @RequestMapping(value = "/library/file/download", method = RequestMethod.GET)
-    public void libraryDownload(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
+    public JSONObject libraryDownload(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
         @RequestParam(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenPara,
         @RequestHeader(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenHeader)
     {
@@ -1009,7 +1143,7 @@ public class CommonFileController
         OutputStream os = null;
         if (StringUtil.isEmpty(tokenPara) && StringUtil.isEmpty(tokenHeader))
         {
-            return;
+            return JsonResUtil.getFailJsonObject();
         }
         String token = StringUtil.isEmpty(tokenPara) ? tokenHeader : tokenPara;
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -1017,11 +1151,17 @@ public class CommonFileController
         Long employeeId = info.getEmployeeId();
         try
         {
+            // 添加文件下载权限
+            boolean flag = fileLibraryAppService.vailFileLibararyAuth(token, id);
+            if (!flag)
+            {
+                return JsonResUtil.getFailJsonObject();
+            }
             StringBuilder queryFileSqlSB = new StringBuilder().append("select * from catalog_").append(companyId).append(" where id = ").append(id);
             JSONObject fileJson = DAOUtil.executeQuery4FirstJSON(queryFileSqlSB.toString());
             if (null == fileJson)
             {
-                return;
+                return JsonResUtil.getFailJsonObject();
             }
             String fileUrl = fileJson.getString("url");
             String fileName = fileJson.getString("name");
@@ -1075,10 +1215,11 @@ public class CommonFileController
             }
             
         }
+        return JsonResUtil.getSuccessJsonObject();
     }
     
     @RequestMapping(value = "/library/file/downloadHistoryFile", method = RequestMethod.GET)
-    public void downloadHistoryFile(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
+    public JSONObject downloadHistoryFile(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
         @RequestParam(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenPara,
         @RequestHeader(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenHeader)
     {
@@ -1087,7 +1228,7 @@ public class CommonFileController
         OutputStream os = null;
         if (StringUtil.isEmpty(tokenPara) && StringUtil.isEmpty(tokenHeader))
         {
-            return;
+            return JsonResUtil.getFailJsonObject();
         }
         String token = StringUtil.isEmpty(tokenPara) ? tokenHeader : tokenPara;
         InfoVo info = TokenMgr.obtainInfo(token);
@@ -1096,11 +1237,12 @@ public class CommonFileController
         Long fileId;
         try
         {
+            
             StringBuilder queryFileSqlSB = new StringBuilder().append("select * from catalog_version_").append(companyId).append(" where id = ").append(id);
             JSONObject fileJson = DAOUtil.executeQuery4FirstJSON(queryFileSqlSB.toString());
             if (null == fileJson)
             {
-                return;
+                return JsonResUtil.getFailJsonObject();
             }
             String fileUrl = fileJson.getString("url");
             String fileName = fileJson.getString("name");
@@ -1155,6 +1297,7 @@ public class CommonFileController
             }
             
         }
+        return JsonResUtil.getSuccessJsonObject();
     }
     
     synchronized void updateDownloadRecord(Long companyId, Long employeeId, Long id)
@@ -1275,7 +1418,7 @@ public class CommonFileController
                 attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
                 attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
-                String fileUrl = OSSUtil.getInstance().importFile(file.getInputStream(), postfix, contentType, downloadTem);
+                String fileUrl = FileDaoUtil.importTemplateFile(file.getInputStream(), postfix, contentType, downloadTem);
                 if (!StringUtils.isEmpty(fileUrl))
                 {// 有可能会上传失败！
                     attachmentJson.put("file_url", fileUrl);
@@ -1297,7 +1440,7 @@ public class CommonFileController
             }
             catch (ServiceException e1)
             {
-                e1.printStackTrace();
+                LOG.error(e.getMessage(), e1);
             }
         }
         return resultArray;
@@ -1335,7 +1478,7 @@ public class CommonFileController
             int sum = ExcelUtil.createTemplate(info.getCompanyId(), jsonObject, downloadTem + "/模版.xlsx");
             if (sum <= 0)
             {
-            
+                
             }
             is = new FileInputStream(downloadTem + "/模版.xlsx");
             fos = new BufferedInputStream(is);
@@ -1448,33 +1591,48 @@ public class CommonFileController
         }
     }
     
-    @RequestMapping(value = "/common/online/preview", method = RequestMethod.GET)
-    public @ResponseBody JSONObject preview(HttpServletRequest request, HttpServletResponse response, @RequestParam(required = true) Long id,
+    @RequestMapping(value = "/common/online/preview", method = RequestMethod.POST)
+    public @ResponseBody JSONObject preview(HttpServletRequest request, HttpServletResponse response, @RequestBody(required = true) String reqstr,
         @RequestParam(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenPara,
         @RequestHeader(value = DataTypes.REQUEST_HEADER_TOKEN, required = false) String tokenHeader)
     {
         JSONObject json = new JSONObject();
         InputStream is = null;
+        BufferedInputStream fos = null;
+        OutputStream os = null;
         String token = StringUtil.isEmpty(tokenPara) ? tokenHeader : tokenPara;
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         try
         {
-            StringBuilder queryFileSqlSB = new StringBuilder().append("select * from catalog_").append(companyId).append(" where id = ").append(id);
+            JSONObject reqJson = JSONObject.parseObject(reqstr);
+            StringBuilder queryFileSqlSB = new StringBuilder().append("select * from catalog_").append(companyId).append(" where id = ").append(reqJson.getString("id"));
             JSONObject fileJson = DAOUtil.executeQuery4FirstJSON(queryFileSqlSB.toString());
             if (null == fileJson)
             {
                 return null;
             }
-            String fileUrl = fileJson.getString("url");
+            String fileUrl = fileJson.getString("pdf_url");
             String fileName = fileJson.getString("name");
+            String postfix = fileName.substring(fileName.lastIndexOf(".") + 1);
+            if (!postfix.equals("pdf"))
+            {
+                fileName = fileName.substring(0, fileName.lastIndexOf(".")) + "pdf";
+            }
             Long size = fileJson.getLongValue("size");
             response.setCharacterEncoding("UTF-8");
             response.setHeader("content-disposition", "attachment; filename=" + java.net.URLEncoder.encode(fileName, "UTF-8"));
             response.setContentLength(size.intValue());
             is = OSSUtil.getInstance().getFile(Constant.FLIE_LIBRARY_NAME, fileUrl);
-            String url = OSSUtil.getInstance().addFile(request, is, fileName);
-            json.put("pdfUrl", url);
+            fos = new BufferedInputStream(is);
+            os = response.getOutputStream();
+            int count;
+            byte[] buffer = new byte[2048];
+            while ((count = fos.read(buffer)) > 0)
+            {
+                os.write(buffer, 0, count);
+            }
+            os.flush();
         }
         catch (Exception e)
         {
@@ -1484,11 +1642,23 @@ public class CommonFileController
         {
             try
             {
+                
                 if (is != null)
                 {
                     
                     is.close();
                 }
+                if (fos != null)
+                {
+                    
+                    fos.close();
+                }
+                if (os != null)
+                {
+                    
+                    os.close();
+                }
+                
             }
             catch (IOException e)
             {
@@ -1525,10 +1695,31 @@ public class CommonFileController
         try
         {
             response.setCharacterEncoding("UTF-8");
+            response.setHeader("content-disposition", "attachment;filename=" + fileUrl);
             is = OSSUtil.getInstance().getFile(Constant.FLIE_LIBRARY_NAME, fileUrl);
-            String url = OSSUtil.getInstance().addFile(request, is, fileUrl);
-            response.setHeader("content-disposition", "attachment;filename=" + url);
-            json.put("pdfUrl", url);
+            String OS = System.getProperty("os.name").toLowerCase();
+            String strDirPath = "";
+            if (OS.indexOf("linux") >= 0)
+            {
+                strDirPath = pdfFileLinuxTempUrl + "/";
+            }
+            else
+            {
+                strDirPath = pdfFileWindowTempUrl + "//";
+            }
+            String upFilePath = strDirPath + fileUrl;
+            LOG.debug("文件预览：fileName = " + fileUrl + " filePath = " + upFilePath);
+            File movieFile = new File(upFilePath);
+            FileUtils.copyInputStreamToFile(is, movieFile);
+            String stuff = fileUrl.substring(fileUrl.lastIndexOf(".") + 1);
+            if (stuff.equals("pdf"))
+            {
+                json.put("pdfUrl", upFilePath);
+                return json;
+            }
+            String pdfName = Office2Pdf.getOutputFilePath(upFilePath);
+            Office2Pdf.word2pdf(upFilePath);
+            json.put("pdfUrl", pdfName);
         }
         catch (Exception e)
         {
@@ -1685,7 +1876,7 @@ public class CommonFileController
     @RequestMapping(value = "/common/file/printUpload", method = RequestMethod.POST)
     public @ResponseBody JSONObject printUpload(HttpServletRequest request, @RequestParam(value = "bean", required = true) String bean,
         @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    
     {
         JSONArray resultArray = new JSONArray();
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
@@ -1749,7 +1940,6 @@ public class CommonFileController
             for (MultipartFile file : fileList)
             {
                 String fileNameNew = file.getOriginalFilename();
-                String contentType = file.getContentType();
                 String postfix = System.currentTimeMillis() + ".xls";
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
@@ -1760,7 +1950,8 @@ public class CommonFileController
                 attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
                 attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
-                String fileUrl = OSSUtil.getInstance().printUpload(file.getInputStream(), postfix, contentType, downloadTem, bean, info);
+                
+                String fileUrl = FileDaoUtil.printUpload(file.getInputStream(), postfix, downloadTem, bean, info);
                 if (!StringUtils.isEmpty(fileUrl))
                 {// 有可能会上传失败！
                     attachmentJson.put("file_url", fileUrl);
@@ -1988,7 +2179,6 @@ public class CommonFileController
      */
     private JSONArray emailImageUploadFile(String beanName, List<MultipartFile> fileList, Long accountId)
     {
-        String buckName = Constant.COMPANY_LIBRARY_NAME;
         JSONArray resultArray = new JSONArray();
         try
         {
@@ -1996,7 +2186,6 @@ public class CommonFileController
             for (MultipartFile file : fileList)
             {
                 String fileNameNew = file.getOriginalFilename();
-                String contentType = file.getContentType();
                 String postfix = fileNameNew.substring(fileNameNew.lastIndexOf(".") + 1);
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
@@ -2007,10 +2196,16 @@ public class CommonFileController
                 attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
                 attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
                 attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
-                String fileUrl = OSSUtil.getInstance().addEmailImageFile(buckName, file.getInputStream(), beanName, fileNameNew, file.getSize(), contentType, accountId);
+                StringBuilder key = new StringBuilder();
+                key.append(accountId).append("/").append(beanName).append("/").append(System.currentTimeMillis()).append(".").append(fileNameNew);
+                
+                String fileUrl = OSSUtil.getInstance().addFile(Constant.COMPANY_LIBRARY_NAME, file.getInputStream(), key.toString(), file.getSize());
                 if (!StringUtils.isEmpty(fileUrl))
                 {// 有可能会上传失败！
-                    attachmentJson.put("file_url", fileUrl);
+                    
+                    String pathUrl = config.getString("teamface.emailfile.url");
+                    pathUrl.concat("bean=").concat(beanName).concat("&fileName=").concat(key.toString());
+                    attachmentJson.put("file_url", pathUrl);
                 }
                 else
                 {
@@ -2053,7 +2248,7 @@ public class CommonFileController
         {
             String buckName = Constant.COMPANY_LIBRARY_NAME;
             response.setCharacterEncoding("UTF-8");
-            response.setHeader("content-disposition", "attachment;filename=" + fileName);
+            response.setHeader("content-disposition", "attachment;filename=" + java.net.URLEncoder.encode(fileName, "UTF-8"));
             is = OSSUtil.getInstance().getFile(buckName, fileName);
             fos = new BufferedInputStream(is);
             os = response.getOutputStream();
@@ -2110,11 +2305,10 @@ public class CommonFileController
      * @return
      * @Description:
      */
-    @RequestMapping(value = "/common/file/projectUpload", method = RequestMethod.POST)
-    public @ResponseBody JSONObject projectUpload(HttpServletRequest request, @RequestParam(value = "parent_id", required = false) String parent_id,
-        @RequestParam(value = "data_id", required = false) String data_id, @RequestParam(value = "type", required = false) String type,
-        @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
-        
+    @RequestMapping(value = "/common/file/projectPersonalUpload", method = RequestMethod.POST)
+    public @ResponseBody JSONObject projectPersonalUpload(HttpServletRequest request, @RequestParam(value = "parent_id", required = false) String parent_id,
+        @RequestParam(value = "type", required = false) String type, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    
     {
         JSONArray resultArray = new JSONArray();
         List<MultipartFile> fileList = new ArrayList<MultipartFile>();
@@ -2147,7 +2341,7 @@ public class CommonFileController
                     return JsonResUtil.getResultJsonByIdent("common.upload.file.type.err");
                 }
             }
-            resultArray = projectUpload(parent_id, fileList, token, data_id, type);
+            resultArray = projectPersonalUpload(parent_id, fileList, token, type);
         }
         catch (Exception e)
         {
@@ -2158,17 +2352,16 @@ public class CommonFileController
     }
     
     /**
-     * 文库上传处理
+     * 文库自己上传
      * 
      * @param parent_id
      * @param fileList
      * @param token
-     * @param data_id
-     * @param type
+     * @param library_type
      * @return
      * @Description:
      */
-    private JSONArray projectUpload(String parent_id, List<MultipartFile> fileList, String token, String data_id, String type)
+    private JSONArray projectPersonalUpload(String parent_id, List<MultipartFile> fileList, String token, String type)
     {
         JSONArray resultArray = new JSONArray();
         try
@@ -2177,7 +2370,6 @@ public class CommonFileController
             for (MultipartFile file : fileList)
             {
                 String fileNameNew = file.getOriginalFilename();
-                String contentType = file.getContentType();
                 String postfix = fileNameNew.substring(fileNameNew.lastIndexOf(".") + 1);
                 if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
                     continue;
@@ -2192,18 +2384,18 @@ public class CommonFileController
                 JSONObject employee = employeeAppService.queryEmployee(info.getEmployeeId(), info.getCompanyId());
                 attachmentJson.put("upload_by", employee.get("employee_name") == null ? "" : employee.get("employee_name"));
                 attachmentJson.put("upload_time", System.currentTimeMillis());
-                String fileUrl = OSSUtil.getInstance().addProjectFile(file.getInputStream(),
-                    fileNameNew,
-                    file.getOriginalFilename(),
-                    file.getSize(),
-                    contentType,
-                    parent_id,
-                    token,
-                    data_id,
-                    type);
+                String fileUrlPath = FileDaoUtil.addProjectPersonalFile(fileNameNew, file.getSize(), parent_id, token, type);
+                if (StringUtils.isEmpty(fileUrlPath))
+                {
+                    return null;
+                }
+                
+                String fileUrl = OSSUtil.getInstance().addFile(Constant.FLIE_LIBRARY_NAME, file.getInputStream(), fileUrlPath, file.getSize());
                 if (!StringUtils.isEmpty(fileUrl))
                 {// 有可能会上传失败！
-                    attachmentJson.put("file_url", fileUrl);
+                    String filePathUrl = config.getString("teamface.file.url");
+                    filePathUrl = filePathUrl.concat("fileName=").concat(fileUrl);
+                    attachmentJson.put("file_url", filePathUrl);
                 }
                 else
                 {
@@ -2257,7 +2449,7 @@ public class CommonFileController
             String fileName = fileJson.getString("file_name");
             Long size = fileJson.getLongValue("size");
             response.setCharacterEncoding("UTF-8");
-            response.setHeader("content-disposition", "attachment;filename=" + fileName);
+            response.setHeader("content-disposition", "attachment;filename=" + java.net.URLEncoder.encode(fileName, "UTF-8"));
             response.setContentLength(size.intValue());
             is = OSSUtil.getInstance().getFile(Constant.FLIE_LIBRARY_NAME, fileUrl);
             fos = new BufferedInputStream(is);
@@ -2303,5 +2495,105 @@ public class CommonFileController
                 
             }
         }
+    }
+    
+    /**
+     * 移动端 banner 上传
+     * 
+     * @param request
+     * @param token
+     * @return
+     * @Description:
+     */
+    @RequestMapping(value = "/common/file/companyBannerUpload", method = RequestMethod.POST)
+    public @ResponseBody JSONObject companyBannerUpload(HttpServletRequest request, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    
+    {
+        JSONArray resultArray = new JSONArray();
+        List<MultipartFile> fileList = new ArrayList<MultipartFile>();
+        try
+        {
+            CommonsMultipartResolver multipartResolver = new CommonsMultipartResolver(request.getSession().getServletContext());
+            // 检查form中是否有enctype="multipart/form-data"
+            if (multipartResolver.isMultipart(request))
+            {
+                // 将request变成多部分request
+                MultipartHttpServletRequest multiRequest = (MultipartHttpServletRequest)request;
+                // 获取multiRequest 中所有的文件名
+                Iterator<String> iter = multiRequest.getFileNames();
+                while (iter.hasNext())
+                {
+                    // 一次遍历所有文件
+                    MultipartFile multipartFile = multiRequest.getFile(iter.next().toString());
+                    fileList.add(multipartFile);
+                }
+            }
+            
+            if (fileList.isEmpty())// 解析文件，文件可以放天RequestParameters里面，亦支持HttpServletRequest
+                fileList = FileUtil.getFileList(request);
+            // 如果上传文件不合法，直接一个文件都不传
+            for (MultipartFile file : fileList)
+            {
+                String postfix = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".") + 1);
+                if (FileBackListErum.getAllPostFix().contains(postfix))
+                {// 如果文件上传的格式在黑名单里面，那么直接继续下一条
+                    return JsonResUtil.getResultJsonByIdent("common.upload.file.type.err");
+                }
+                if (file.getSize() > 102400)
+                {
+                    return JsonResUtil.getResultJsonByIdent("common.upload.file.size.error");
+                }
+            }
+            resultArray = bannerUploadFile("company", fileList);
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getResultJsonObject(resultCode.get("common.fail"), e.getMessage());
+        }
+        return JsonResUtil.getSuccessJsonObject(resultArray);
+    }
+    
+    /**
+     * 移动端banner
+     * 
+     * @param beanName
+     * @param fileList
+     * @return
+     * @throws ServiceException
+     * @Description:
+     */
+    private JSONArray bannerUploadFile(String beanName, List<MultipartFile> fileList)
+        throws ServiceException
+    {
+        String buckName = Constant.COMPANY_LIBRARY_NAME;
+        JSONArray resultArray = new JSONArray();
+        try
+        {
+            int serialNumber = 0;
+            for (MultipartFile file : fileList)
+            {
+                String fileNameNew = file.getOriginalFilename();
+                String postfix = fileNameNew.substring(fileNameNew.lastIndexOf(".") + 1);
+                if (FileBackListErum.getAllPostFix().contains(postfix))// 如果文件上传的格式在黑名单里面，那么直接继续下一条
+                    continue;
+                serialNumber++;
+                JSONObject attachmentJson = new JSONObject();
+                attachmentJson.put("original_file_name", fileNameNew);
+                attachmentJson.put("file_name", fileNameNew);
+                attachmentJson.put("file_type", postfix.toLowerCase());// 文件后缀，全部小写
+                attachmentJson.put("file_size", file.getSize());// 文件大小，以B为单位
+                attachmentJson.put("serial_number", serialNumber);// 文件的序列号，一次上传多张文件时，按顺序返回，序号从0开始
+                String key = OSSUtil.getInstance().addFile(buckName, file.getInputStream(), fileNameNew, file.getSize());
+                String fileUrl = imageFileUrl.concat("bean=").concat(beanName).concat("&fileName=").concat(key).concat("&fileSize=") + file.getSize();
+                attachmentJson.put("file_url", fileUrl);
+                resultArray.add(attachmentJson);
+            }
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException(e);
+        }
+        return resultArray;
     }
 }

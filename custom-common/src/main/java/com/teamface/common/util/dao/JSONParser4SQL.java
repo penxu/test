@@ -1,5 +1,6 @@
 package com.teamface.common.util.dao;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ import com.teamface.common.util.CustomUtil;
 import com.teamface.common.util.PropertiesConfigObject;
 import com.teamface.common.util.StringUtil;
 import com.teamface.common.util.dao.UtilDTO.Field;
+import com.thoughtworks.xstream.mapper.Mapper.Null;
 
 /**
  * @Description:
@@ -295,6 +297,7 @@ public class JSONParser4SQL
                                     commentSql.append("COMMENT ON COLUMN ").append(tableName).append(".").append(newField.name).append(" is \'").append(newField.label).append(
                                         "\';");
                                     alterFields.put(newField.name, newField.label);
+                                    alterFields.put(newField.name, newField.label);
                                 }
                                 oldFields.remove(oldField);
                                 break;
@@ -448,6 +451,7 @@ public class JSONParser4SQL
             Entry<String, Object> entry = objs.next();
             String key = entry.getKey();
             Object value = entry.getValue();
+            value = SpecialJSONParser4SQL.getValue(value, key);
             if (key.startsWith(Constant.TYPE_SUBFORM))
             {
                 continue;
@@ -946,6 +950,10 @@ public class JSONParser4SQL
             selectType = true;
             field = field + Constant.PICKUP_VALUE_FIELD_SUFFIX;
         }
+        else if (field.contains(Constant.TYPE_PERSONNEL))
+        {
+            selectType = true;
+        }
         if ("in".equals(valueField))
         {
             value = value.substring(1);
@@ -1064,6 +1072,255 @@ public class JSONParser4SQL
         return resultSB.toString();
     }
     
+    private static String getOperatorWhere(String field, String operator, String value, String valueField, long companyId)
+    {
+        if (StringUtil.isEmpty(field) || StringUtil.isEmpty(operator)
+            || (StringUtil.isEmpty(value) && !("ISNOTNULL".equals(operator) || "ISNULL".equals(operator) || field.contains(Constant.TYPE_DATETIME))))
+        {
+            return "";
+        }
+        if ("ISNOTNULL".equals(operator) || "ISNULL".equals(operator))
+        {
+            value = "";
+        }
+        boolean multiSelect = false;
+        String[] fields = field.split(":");
+        if (fields.length > 1)
+        {
+            field = fields[0];
+            multiSelect = "true".equals(fields[1]);
+        }
+        StringBuilder resultSB = new StringBuilder();
+        StringBuilder valueSB = new StringBuilder();
+        if (value.startsWith("[{"))
+        {
+            JSONArray arr = JSONArray.parseArray(value);
+            if (field.equals("#CURRENT_ROLE#") || field.equals("#CURRENT_DEP#"))
+            {
+                if ("CONTAIN".equals(operator) || "NCONTAIN".equals(operator))
+                {
+                    for (int i = 0; i < arr.size(); i++)
+                    {
+                        JSONObject json = arr.getJSONObject(i);
+                        if (valueSB.length() > 0)
+                        {
+                            valueSB.append(",");
+                        }
+                        valueSB.append(json.get("id"));
+                    }
+                }
+                else
+                {
+                    if (arr.size() > 1)
+                    {
+                        valueSB.append(0);
+                    }
+                    else
+                    {
+                        valueSB.append(((JSONObject)arr.get(0)).get("id"));
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < arr.size(); i++)
+                {
+                    JSONObject json = arr.getJSONObject(i);
+                    if (valueSB.length() > 0)
+                    {
+                        valueSB.append(",");
+                    }
+                    valueSB.append(json.get(valueField));
+                }
+            }
+            value = valueSB.toString();
+        }
+        boolean selectType = false;
+        if (field.contains(Constant.TYPE_PICKLIST) || field.contains(Constant.TYPE_MULTI) || field.contains(Constant.TYPE_MUTLI_PICKLIST))
+        {
+            selectType = true;
+            field = field + Constant.PICKUP_VALUE_FIELD_SUFFIX;
+        }
+        if ("in".equals(valueField))
+        {
+            value = value.substring(1);
+            if ("EQUALS".equals(operator))
+            {
+                resultSB.append("position(").append(field).append(" in '").append(value).append(",')>0");
+            }
+            else if ("NEQUALS".equals(operator))
+            {
+                resultSB.append("position(").append(field).append(" in '").append(value).append(",')=0");
+            }
+        }
+        else
+        {
+            if ("CONTAIN".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    resultSB.append("(select role_id from employee_").append(companyId).append(" where id = personnel_principal) in (").append(value).append(")");
+                }
+                else if (field.equals("#CURRENT_DEP#"))
+                {
+                    resultSB.append("ARRAY[").append(value).append("] && string_to_array((select string_agg(department_id,',') from department_center_").append(companyId).append(
+                        " where employee_id = personnel_principal), ',')::int[]");
+                }
+                else
+                {
+                    if (multiSelect)
+                    {
+                        resultSB.append("string_to_array(").append(field).append(",',') @> string_to_array('").append(value).append("',',')");
+                    }
+                    else if (selectType)
+                    {
+                        resultSB.append("string_to_array('").append(value).append("',',') @> string_to_array(").append(field).append(",',')");
+                    }
+                    else
+                    {
+                        resultSB.append("position('").append(value).append("' in ").append(field).append(")>0");
+                    }
+                }
+            }
+            else if ("NCONTAIN".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    resultSB.append("(select role_id from employee_").append(companyId).append(" where id = personnel_principal) not in (").append(value).append(")");
+                }
+                else if (field.equals("#CURRENT_DEP#"))
+                {
+                    resultSB.append("(ARRAY[").append(value).append("] && string_to_array((select string_agg(department_id,',') from department_center_").append(companyId).append(
+                        " where employee_id = personnel_principal), ',')::int[]) = false");
+                }
+                else
+                {
+                    if (multiSelect)
+                    {
+                        resultSB.append("not(string_to_array(").append(field).append(",',') @> string_to_array('").append(value).append("',','))");
+                    }
+                    else if (selectType)
+                    {
+                        resultSB.append("not(string_to_array('").append(value).append("',',') @> string_to_array(").append(field).append(",','))");
+                    }
+                    else
+                    {
+                        resultSB.append("position('").append(value).append("' in ").append(field).append(")=0");
+                    }
+                }
+            }
+            else if ("EQUALS".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    field = "(select role_id from employee_" + companyId + " where id = personnel_principal)";
+                }
+                if (field.equals("#CURRENT_DEP#"))
+                {
+                    resultSB.append("ARRAY[").append(value).append("]@>string_to_array((select string_agg(department_id,',') from department_center_").append(companyId).append(
+                        " where employee_id = personnel_principal), ',')::int[]");
+                }
+                else
+                {
+                    resultSB.append(field).append("='").append(value).append("'");
+                }
+            }
+            else if ("NEQUALS".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    field = "(select role_id from employee_" + companyId + " where id = personnel_principal)";
+                }
+                if (field.equals("#CURRENT_DEP#"))
+                {
+                    resultSB.append("(ARRAY[").append(value).append("]@>string_to_array((select string_agg(department_id,',') from department_center_").append(companyId).append(
+                        " where employee_id = personnel_principal), ',')::int[])=false");
+                }
+                else
+                {
+                    resultSB.append(field).append("<>'").append(value).append("'");
+                }
+            }
+            else if ("ISNULL".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    field = "(select role_id from employee_" + companyId + " where id = personnel_principal)";
+                }
+                else if (field.equals("#CURRENT_DEP#"))
+                {
+                    field = "(select department_id from department_center_" + companyId + " where employee_id = personnel_principal)";
+                }
+                resultSB.append(field).append(" is null");
+            }
+            else if ("ISNOTNULL".equals(operator))
+            {
+                if (field.equals("#CURRENT_ROLE#"))
+                {
+                    field = "(select role_id from employee_" + companyId + " where id = personnel_principal)";
+                }
+                else if (field.equals("#CURRENT_DEP#"))
+                {
+                    field = "(select department_id from department_center_" + companyId + " where employee_id = personnel_principal)";
+                }
+                resultSB.append(field).append(" is not null");
+            }
+            else if ("PREFIX".equals(operator))
+            {
+                resultSB.append(field).append(" like '").append(value).append("%'");
+            }
+            else if ("GREATER".equals(operator))
+            {
+                resultSB.append("to_number(").append(field).append(", '9999999999999.99')>").append(value);
+            }
+            else if ("LESS".equals(operator))
+            {
+                resultSB.append("to_number(").append(field).append(", '9999999999999.99')<").append(value);
+            }
+            else if ("GREATERE".equals(operator))
+            {
+                resultSB.append("to_number(").append(field).append(", '9999999999999.99')>=").append(value);
+            }
+            else if ("LESSE".equals(operator))
+            {
+                resultSB.append("to_number(").append(field).append(", '9999999999999.99')<=").append(value);
+            }
+            else if ("BEFORE".equals(operator))
+            {
+                resultSB.append(field).append("<").append(value);
+            }
+            else if ("AFTER".equals(operator))
+            {
+                resultSB.append(field).append(">").append(value);
+            }
+            else if ("TODAY".equals(operator))
+            {
+                resultSB.append(" extract (DOY from to_timestamp(").append(field).append("/1000))=extract (DOY from now())");
+            }
+            else if ("WEEK".equals(operator))
+            {
+                resultSB.append(" extract (week from to_timestamp(").append(field).append("/1000))=extract (week from now())");
+            }
+            else if ("MONTH".equals(operator))
+            {
+                resultSB.append(" extract (MONTH from to_timestamp(").append(field).append("/1000))=extract (MONTH from now())");
+            }
+            else if ("QUARTER".equals(operator))
+            {
+                resultSB.append(" extract (year from to_timestamp(").append(field).append("/1000))=extract (year from now())");
+            }
+            else if ("BETWEEN".equals(operator))
+            {
+                String[] arr = value.split(",");
+                if (arr.length > 1)
+                {
+                    resultSB.append(field).append(" >=").append(arr[0]).append(" and ").append(field).append(" <=").append(arr[1]);
+                }
+            }
+        }
+        return resultSB.toString();
+    }
+    
     public static String getOpteratorType(String expression)
     {
         if ("EQUALS".equals(expression))
@@ -1169,6 +1426,71 @@ public class JSONParser4SQL
     
     /**
      * 
+     * @param relationJson 关联关系json
+     * @return String
+     * @Description:获取关联关系的高级查询条件
+     */
+    public static String getSeniorWhere4Relation(JSONObject relationJson, long companyId)
+    {
+        JSONArray currentRelationRelevanceWhere = relationJson.getJSONArray("relevanceWhere");
+        String seniorWhere = relationJson.getString("seniorWhere");
+        if (currentRelationRelevanceWhere != null && currentRelationRelevanceWhere.size() > 0)
+        {
+            StringBuilder whereSB = new StringBuilder();
+            List<String> whereLS = new ArrayList<>();
+            for (Object object : currentRelationRelevanceWhere)
+            {
+                JSONObject json = (JSONObject)object;
+                String field = json.getString("fieldName");
+                String operatorType = json.getString("operatorType");
+                String value = json.getString("value");
+                String valueField = json.getString("valueField");
+                String where = getOperatorWhere(field, operatorType, value, valueField, companyId);
+                if (where.length() > 0)
+                {
+                    whereLS.add(where);
+                    if (whereSB.length() > 0)
+                    {
+                        whereSB.append(" and ");
+                    }
+                    whereSB.append(where);
+                }
+            }
+            if (StringUtil.isEmpty(seniorWhere))
+            {
+                return whereSB.toString();
+            }
+            else
+            {
+                seniorWhere = seniorWhere.toUpperCase().replace("AND", " AND ").replace("OR", " OR ");
+                int index = 0;
+                StringBuilder newSeniorWhere = new StringBuilder();
+                Pattern r = Pattern.compile("(\\d+)");
+                Matcher m = r.matcher(seniorWhere);
+                while (m.find())
+                {
+                    int findNum = Integer.parseInt(m.group(1));
+                    String newspace = whereLS.get(findNum - 1);
+                    if (whereLS.size() < findNum)
+                    {
+                        newspace = findNum + "=" + findNum;
+                    }
+                    
+                    int index1 = seniorWhere.indexOf(String.valueOf(findNum));
+                    newSeniorWhere.append(seniorWhere.substring(index, index1));
+                    newSeniorWhere.append(newspace);
+                    index = index1 + 1;
+                }
+                newSeniorWhere.append(seniorWhere.substring(index));
+                seniorWhere = newSeniorWhere.toString();
+            }
+            
+        }
+        return seniorWhere;
+    }
+    
+    /**
+     * 
      * @param companyId 公司编号
      * @param beanName 模块名
      * @param field 当前字段名
@@ -1221,7 +1543,7 @@ public class JSONParser4SQL
             Map<String, String> sqlMap = getMenuQuerySql(companyId, bean, (List<String>)tmpMap.get("fields"), (String)tmpMap.get("appFields"), fields, whereJson, false);
             String sql = sqlMap.get("sql");
             JSONArray sortFields = whereJson.getJSONArray("sort");
-            String sortStr = getSrotSql(sortFields);
+            // String sortStr = getSrotSql(sortFields);
             
             sqlSB.append(sql);
             if (!StringUtil.isEmpty(menuWhere))
@@ -1384,7 +1706,7 @@ public class JSONParser4SQL
                                     {
                                         if (!(tmpf.equals("id") || tmpf.equals(referenceField)))
                                         {
-                                            personnelFieldSB.append("||':'||'").append(tmpf).append("#'||':'||").append(tmpf).append("||''");
+                                            personnelFieldSB.append("||':'||'").append(tmpf).append("#'||':'||COALESCE(").append(tmpf).append(",'')||''");
                                         }
                                     }
                                     String postTableName = DAOUtil.getTableName(Constant.TABLE_POST, companyId);
@@ -1500,6 +1822,10 @@ public class JSONParser4SQL
                 {
                     sqlSB.append(" order by ").append(sortStr);
                 }
+            }
+            else
+            {
+                sqlSB.append(" order by 1 ");
             }
         }
         
@@ -1737,7 +2063,7 @@ public class JSONParser4SQL
                             .append(" from ")
                             .append(tableName)
                             .append(" t ");
-                        if (!Constant.EMPLOYEE_TABLE.equalsIgnoreCase(referenceBean))
+                        if (!Constant.EMPLOYEE_TABLE.equalsIgnoreCase(referenceBean) || !Constant.TABLE_DEPARTMENT.equalsIgnoreCase(referenceBean))
                         {
                             joinSQLSB.append(" where ").append(Constant.FIELD_DEL_STATUS).append("=0 ");
                         }
@@ -1824,21 +2150,23 @@ public class JSONParser4SQL
         Map<String, String> fieldAliasMap = new HashMap<>();
         
         List<JSONObject> jsonLS = new ArrayList<JSONObject>();
-        Object relationObj =
-            JedisClusterHelper.get(new StringBuilder(companyId).append("_").append(bean).append("_").append(RedisKey4Function.LAYOUT_RELATION.getIndex()).toString());
-        if (null != relationObj)
-        {// 从缓存获取
-            JSONObject relationJSON = (JSONObject)relationObj;
-            jsonLS.add(relationJSON);
-        }
-        else
-        {// 从mongodb获取
-            Document filter = new Document();
-            filter.put("companyId", companyId);
-            filter.put("bean", bean);
-            jsonLS = mongoDB.find4JSONObject(Constant.RELATION_COLLECTION, filter);
-        }
-        if (jsonLS.size() > 0)
+        // # 这些从缓存获取，但是现在报异常，先注释掉 #
+        // Object relationObj =
+        // JedisClusterHelper.get(new
+        // StringBuilder(companyId).append("_").append(bean).append("_").append(RedisKey4Function.LAYOUT_RELATION.getIndex()).toString());
+        // if (null != relationObj)
+        // {// 从缓存获取
+        // JSONObject relationJSON = (JSONObject)relationObj;
+        // jsonLS.add(relationJSON);
+        // }
+        // else
+        // {// 从mongodb获取
+        Document filter = new Document();
+        filter.put("companyId", companyId);
+        filter.put("bean", bean);
+        jsonLS = mongoDB.find4JSONObject(Constant.RELATION_COLLECTION, filter);
+        // }
+        if (jsonLS != null && jsonLS.size() > 0)
         {
             JSONObject tmp = jsonLS.get(0);
             for (Object obj : tmp.getJSONArray("reference"))
@@ -2681,6 +3009,10 @@ public class JSONParser4SQL
         String currentRelationField = currentRelationJson.getString("referenceField");
         String currentRelationBean = currentRelationJson.getString("referenceBean");
         JSONArray currentRelationSearchFields = currentRelationJson.getJSONArray("searchFields");
+        if (!currentRelationField.isEmpty())
+        {
+            currentRelationSearchFields.add(currentRelationField);
+        }
         JSONArray conditionArray = currentRelationJson.getJSONArray("relevanceWhere");
         JSONArray array = new JSONArray();
         for (Iterator itera = conditionArray.iterator(); itera.hasNext();)
@@ -2721,15 +3053,8 @@ public class JSONParser4SQL
                 if (searchField.startsWith("personnel_"))
                 {
                     String table = DAOUtil.getTableName(Constant.EMPLOYEE_TABLE, companyId);
-                    whereSQLSB.append(Constant.MAIN_TABLE_ALIAS)
-                        .append(".")
-                        .append(searchField)
-                        .append(" in ( select id from ")
-                        .append(table)
-                        .append(" where employee_name like '%")
-                        .append(keyword)
-                        .append("%' )");
-                    
+                    whereSQLSB.append(Constant.MAIN_TABLE_ALIAS).append(".").append(searchField).append(" in ( select id from ");
+                    whereSQLSB.append(table).append(" where employee_name like '%").append(keyword).append("%' )");
                 }
                 else
                 {
@@ -2760,15 +3085,16 @@ public class JSONParser4SQL
         {
             listFields.add("id");
         }
-        if (!listFields.contains(currentRelationField))
+        if (!listFields.contains(currentRelationField) && !currentRelationField.isEmpty())
         {
-            
             listFields.add(currentRelationField);
         }
         tmpMap.put("fields", listFields);
         JSONObject whereJson = new JSONObject();
         whereJson.put("where", new JSONObject());
         Map<String, String> sqlMap = getRelationRelyonQuerySql(companyId, currentRelationBean, tmpMap.get("fields"), "", fields, whereJson, false);
+        if (currentRelationBean.isEmpty())
+            return null;
         sqlSB.append(sqlMap.get("sql").toString());
         if (whereSQLSB.length() > 0)
         {

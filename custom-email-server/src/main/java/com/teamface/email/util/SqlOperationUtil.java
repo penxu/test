@@ -26,12 +26,13 @@ public class SqlOperationUtil
         Set<String> keys = json.keySet();
         for (String key : keys)
         {
-            if (!key.equals("id") && !key.equals("ID") && !key.equals("employee_id") && !key.equals("create_time") && !key.equals("account_name"))
+            if (!"id".equals(key) && !"ID".equals(key) && !"employee_id".equals(key) && !"create_time".equals(key) && !"account_name".equals(key))
             {
                 fieldSB.append(fieldSB.length() > 0 ? comma : "")
                     .append(type == MailConstant.SQL_POSITION_FEILD ? key
                         : !(json.get(key) instanceof Number || json.get(key) instanceof Character)
-                            ? (json.get(key) == null || json.get(key).equals("")) ? null : "'" + json.get(key) + "'" : json.get(key));
+                            ? (json.get(key) == null || json.get(key).equals("")) ? null : "'" + json.get(key) + "'"
+                            : json.get(key));
             }
         }
         return fieldSB.toString();
@@ -49,7 +50,7 @@ public class SqlOperationUtil
         Set<String> keys = json.keySet();
         for (String key : keys)
         {
-            if (!key.equals("id") && !key.equals("ID") && !key.equals("employee_id") && !key.equals("create_time") && !key.equals("account_name") && !key.equals("val_status"))
+            if (!"id".equals(key) && !"ID".equals(key) && !"employee_id".equals(key) && !"create_time".equals(key) && !"account_name".equals(key) && !"val_status".equals(key))
             {
                 fieldSB.append(fieldSB.length() > 0 ? comma : "").append(key);
                 fieldSB.append(equalSign).append(!(json.get(key) instanceof Number) ? "'" + json.getString(key).replace("'", "''") + "'" : json.get(key));

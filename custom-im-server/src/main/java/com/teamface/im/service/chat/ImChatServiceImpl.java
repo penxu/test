@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +27,6 @@ import com.teamface.im.dao.PushReleventInfoDAO;
 import com.teamface.im.util.PushAsynHandle;
 
 import io.jsonwebtoken.lang.Collections;
-
 
 /**
  * @Description:
@@ -81,7 +81,7 @@ public class ImChatServiceImpl implements ImChatService
     {
         // 添加群信息
         ServiceResult<String> addResultObj = addGroupChat(token, jsonStr);
-        if (!addResultObj.getCode().equals("1001"))
+        if (!"1001".equals(addResultObj.getCode()))
         {
             JsonResUtil.getResultJsonObject(addResultObj.getCode(), addResultObj.getObj());
         }
@@ -138,7 +138,7 @@ public class ImChatServiceImpl implements ImChatService
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         Long accountId = info.getSignId();
-        if (accountId == receiverId)
+        if (accountId.equals(receiverId))
         {
             return JsonResUtil.getFailJsonObject();
         }
@@ -157,7 +157,7 @@ public class ImChatServiceImpl implements ImChatService
             return JsonResUtil.getSuccessJsonObject(queryObj);
         }
         ServiceResult<String> addResultObj = addSingleChat(token, receiverId);
-        if (!addResultObj.getCode().equals("1001"))
+        if (!"1001".equals(addResultObj.getCode()))
         {
             JsonResUtil.getResultJsonObject(addResultObj.getCode(), addResultObj.getObj());
         }
@@ -231,6 +231,10 @@ public class ImChatServiceImpl implements ImChatService
         insertData.add(accountId);
         insertData.add(json.get("type"));
         insertData.add(companyId);
+        if (Objects.isNull(accountId))
+        {
+            log.error("addGroupChat:there is no principal......");
+        }
         StringBuilder sqlSB = new StringBuilder().append("insert into ").append(IM_GROUP_CHAT);
         sqlSB.append(" (name,notice,peoples,create_time,principal,type,company_id) values (?,?,?,?,?,?,?);");
         int res = DAOUtil.executeUpdate(sqlSB.toString(), insertData.toArray());
@@ -278,7 +282,7 @@ public class ImChatServiceImpl implements ImChatService
             rowData.add(currentTime);
             rowData.add(currentTime);
             rowData.add(companyId);
-            rowData.add(0);
+            rowData.add(1);
             insertData.add(rowData.toArray());
         }
         if (!Collections.isEmpty(insertData))
@@ -303,6 +307,10 @@ public class ImChatServiceImpl implements ImChatService
      */
     private void saveCompanyGroup(Long companyId, String peopleStr, Long accountId)
     {
+        if (Objects.isNull(accountId))
+        {
+            log.error("saveCompanyGroup:there is no accountId......");
+        }
         long currentTime = System.currentTimeMillis();
         StringBuilder sqlSB = new StringBuilder().append("insert into ")
             .append(IM_GROUP_CHAT)
@@ -369,7 +377,7 @@ public class ImChatServiceImpl implements ImChatService
             rowData.add(currentTime);
             rowData.add(currentTime);
             rowData.add(companyId);
-            rowData.add(0);
+            rowData.add(1);
             insertData.add(rowData.toArray());
         }
         if (!Collections.isEmpty(insertData))
@@ -404,7 +412,7 @@ public class ImChatServiceImpl implements ImChatService
             rowData.add(currentTime);
             rowData.add(currentTime);
             rowData.add(companyId);
-            rowData.add(0);
+            rowData.add(1);
             insertData.add(rowData.toArray());
         }
         if (!Collections.isEmpty(insertData))
@@ -445,7 +453,7 @@ public class ImChatServiceImpl implements ImChatService
             rowData.add(currentTime);
             rowData.add(currentTime);
             rowData.add(companyId);
-            rowData.add(0);
+            rowData.add(1);
             insertData.add(rowData.toArray());
         }
         if (!Collections.isEmpty(insertData))
@@ -471,7 +479,7 @@ public class ImChatServiceImpl implements ImChatService
         
         ServiceResult<String> serviceResult = new ServiceResult<>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
-        if (accountId == receiverId)
+        if (accountId.equals(receiverId))
         {
             serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
             return serviceResult;
@@ -934,7 +942,7 @@ public class ImChatServiceImpl implements ImChatService
             StringBuilder queryAssistantSqlSB =
                 new StringBuilder().append("select id from ").append(IM_ASSISTANT).append(" where company_id = ").append(companyId).append(" and type = 2");
             JSONObject assistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());
-            Long assistantId = 0l;
+            Long assistantId = 0L;
             JSONObject pushContent = new JSONObject();
             pushContent.put("type", 1);
             pushContent.put("push_content", contentSB);
@@ -1030,7 +1038,7 @@ public class ImChatServiceImpl implements ImChatService
                 .append(accountId)
                 .append(" and company_id = ")
                 .append(companyId);
-                
+            
         }
         int updateResult = DAOUtil.executeUpdate(updateSqlSB.toString());
         if (updateResult <= 0)
@@ -1140,7 +1148,7 @@ public class ImChatServiceImpl implements ImChatService
         JSONObject jsonObj = DAOUtil.executeQuery4FirstJSON(querySqlSB.toString());
         if (type == 1)
         {
-            Long groupId = 0l;
+            Long groupId = 0L;
             String groupPeople = "";
             // 更新
             if (jsonObj != null)
@@ -1161,9 +1169,9 @@ public class ImChatServiceImpl implements ImChatService
             // 查询当前公司的助手信息
             StringBuilder queryAssistantSqlSB = new StringBuilder().append("select * from ").append(IM_ASSISTANT).append(" where company_id = ").append(companyId).append(";");
             List<JSONObject> assistantJsonObj = DAOUtil.executeQuery4JSON(queryAssistantSqlSB.toString());
-            Long groupId = 0l;
+            Long groupId = 0L;
             String groupPeople = "";
-            Long assistantId = 0l;
+            Long assistantId = 0L;
             Long currentTime = System.currentTimeMillis();
             if (null == jsonObj && null == assistantJsonObj)
             {
@@ -1283,7 +1291,7 @@ public class ImChatServiceImpl implements ImChatService
         JSONObject assistantJson = JSONObject.parseObject(assisstantInfo);
         log.error("时间" + System.currentTimeMillis() + " saveAssisstantInfo 名称 " + assistantJson.getString("application_name"));
         String applicationName = assistantJson.getString("application_name");
-        long applicationId = 0l;
+        long applicationId = 0L;
         StringBuilder assistantExestence = new StringBuilder().append("select count(*) from ").append(IM_ASSISTANT).append(" where company_id =").append(companyId);
         
         if (!assistantJson.getString("application_id").isEmpty())
@@ -1358,7 +1366,7 @@ public class ImChatServiceImpl implements ImChatService
         JSONObject assistantJson = JSONObject.parseObject(assisstantInfo);
         log.error("时间" + System.currentTimeMillis() + " updateAssisstantInfo 名称 " + assistantJson.getString("application_name"));
         String applicationName = assistantJson.getString("application_name");
-        long applicationId = 0l;
+        long applicationId = 0L;
         if (!assistantJson.getString("application_id").isEmpty())
         {
             applicationId = assistantJson.getLongValue("application_id");
@@ -1495,7 +1503,7 @@ public class ImChatServiceImpl implements ImChatService
             return JsonResUtil.getFailJsonObject();
         }
         // 删除原有群成员信息
-        JedisClusterHelper.hdel(cacheKey, redisMememer);
+        JedisClusterHelper.del(cacheKey);
         log.warn(cacheKey + " remove " + redisMememer.toString() + " successfully!");
         // 新增redis群成员信息
         long currentTime = System.currentTimeMillis();
@@ -1522,7 +1530,7 @@ public class ImChatServiceImpl implements ImChatService
         // 获取被踢的人的数量
         String[] selectedPerson = getKickPeopleInfo(memberArr, memberNew);
         savePushInfo(selectedPerson, companyId, accountId, groupId, contentSB.toString(), ImConstant.PUSHE_MESSAGE_TYPE_GROUP_KICK);
-        pushGroupNotification(ImConstant.PUSHE_MESSAGE_TYPE_GROUP_KICK, groupId);
+        pushGroupNotification(ImConstant.PUSHE_MESSAGE_TYPE_GROUP_PULL, groupId);
         return JsonResUtil.getSuccessJsonObject(resultObj);
     }
     
@@ -1590,9 +1598,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private List<JSONObject> getGroupListInfo(Long companyId, Long accountId)
     {
-        StringBuilder groupSqlSB = new StringBuilder()
-            .append(
-                "select distinct chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type")
+        StringBuilder groupSqlSB = new StringBuilder().append(
+            "select distinct chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type")
             .append(" from im_group_chat chat left join im_group_settings setting on setting.group_id = chat.id where setting.employee_id = ")
             .append(accountId)
             .append(" and position(setting.employee_id in chat.peoples) > 0 and setting.company_id = ")
@@ -1610,9 +1617,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private List<JSONObject> getSingleListInfo(Long companyId, Long accountId)
     {
-        StringBuilder singleSqlSB = new StringBuilder()
-            .append(
-                "select distinct chat.id,setting.relative_receiver as receiver_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,2 as chat_type,emp.employee_name,emp.picture from im_single_settings setting,im_single_chat chat,acountinfo acc,employee_")
+        StringBuilder singleSqlSB = new StringBuilder().append(
+            "select distinct chat.id,setting.relative_receiver as receiver_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,2 as chat_type,emp.employee_name,emp.picture from im_single_settings setting,im_single_chat chat,acountinfo acc,employee_")
             .append(companyId)
             .append(" emp where setting.employee_id = ")
             .append(accountId)
@@ -1631,9 +1637,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private static List<JSONObject> getAssisstantListInfoAndUnread(Long companyId, Long accountId)
     {
-        StringBuilder assistantSqlSB = new StringBuilder()
-            .append(
-                "select distinct chat.id,chat.name,chat.type,chat.create_time,chat.application_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,3 as chat_type,unread.unread_nums,outerpmc.datetime_create_time as latest_push_time,outerpmc.push_content as latest_push_content")
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "select distinct chat.id,chat.name,chat.type,chat.create_time,chat.application_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,3 as chat_type,unread.unread_nums,outerpmc.datetime_create_time as latest_push_time,app.icon,outerpmc.push_content as latest_push_content")
             .append(" from im_assistant_settings setting join im_assistant chat on setting.assistant_id = chat.id")
             .append(" left join(select count(*) as unread_nums,pmc.assistant_id from push_message_content_")
             .append(companyId)
@@ -1642,6 +1647,9 @@ public class ImChatServiceImpl implements ImChatService
             .append(" pri where pmc.id = pri.push_message_id and pri.read_status = 0 and pri.sign_id =")
             .append(accountId)
             .append(" group by pmc.assistant_id ) unread on unread.assistant_id = chat.id")
+            .append(" left join application_")
+            .append(companyId)
+            .append(" app on chat.application_id = app.id")
             .append(" left join(select s.*  from (select r.*, row_number() over (partition by r.assistant_id order by r.datetime_create_time desc) as group_idx from (SELECT")
             .append(" pmc.push_content,pmc.assistant_id,pmc.datetime_create_time from push_message_content_")
             .append(companyId)
@@ -1667,9 +1675,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private JSONObject getAssisstantInfo(Long companyId, Long accountId, Long assisstantId)
     {
-        StringBuilder assistantSqlSB = new StringBuilder()
-            .append(
-                "select chat.id,chat.name,chat.type,chat.create_time,chat.application_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,setting.show_type,3 as chat_type from im_assistant_settings setting,im_assistant chat where setting.employee_id = ")
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "select chat.id,chat.name,chat.type,chat.create_time,chat.application_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,setting.show_type,3 as chat_type from im_assistant_settings setting,im_assistant chat where setting.employee_id = ")
             .append(accountId)
             .append(" and setting.company_id = ")
             .append(companyId)
@@ -1699,7 +1706,7 @@ public class ImChatServiceImpl implements ImChatService
                 .append(" and ias.company_id = ")
                 .append(companyId);
         JSONObject showTypeObj = DAOUtil.executeQuery4FirstJSON(queryShowType.toString());
-        Long showType = 0l;
+        Long showType = 0L;
         Integer assistantType = 0;
         if (null != showTypeObj)
         {
@@ -1722,10 +1729,13 @@ public class ImChatServiceImpl implements ImChatService
                 querySQL = getLibAssistantSQL(companyId, assisstantId, accountId, showType);
                 break;
             case ImConstant.ASSISTANT_TYPE_MEMO:
-                querySQL = getLibAssistantSQL(companyId, assisstantId, accountId, showType);
+                querySQL = getCommonAssistantSQL(companyId, assisstantId, accountId, showType);
                 break;
             case ImConstant.ASSISTANT_TYPE_EMAIL:
-                querySQL = getLibAssistantSQL(companyId, assisstantId, accountId, showType);
+                querySQL = getCommonAssistantSQL(companyId, assisstantId, accountId, showType);
+                break;
+            case ImConstant.ASSISTANT_TYPE_TASK:
+                querySQL = getCommonAssistantSQL(companyId, assisstantId, accountId, showType);
                 break;
             default:
                 break;
@@ -1802,9 +1812,8 @@ public class ImChatServiceImpl implements ImChatService
     
     private JSONObject getGroupInfoByPrincipal(Long companyId, Long accountId, Long groupId)
     {
-        StringBuilder groupSqlSB = new StringBuilder()
-            .append(
-                "select chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type  from im_group_settings setting,im_group_chat chat where setting.employee_id = ")
+        StringBuilder groupSqlSB = new StringBuilder().append(
+            "select chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type  from im_group_settings setting,im_group_chat chat where setting.employee_id = ")
             .append(accountId)
             .append(" and setting.company_id = ")
             .append(companyId)
@@ -1823,9 +1832,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private JSONObject getGroupInfoById(Long companyId, Long groupId)
     {
-        StringBuilder groupSqlSB = new StringBuilder()
-            .append(
-                "select chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type  from im_group_settings setting,im_group_chat chat where setting.company_id = ")
+        StringBuilder groupSqlSB = new StringBuilder().append(
+            "select chat.id,chat.name,chat.notice,chat.peoples,chat.create_time,chat.principal,chat.type,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,1 as chat_type  from im_group_settings setting,im_group_chat chat where setting.company_id = ")
             .append(companyId)
             .append(" and setting.group_id = ")
             .append(groupId)
@@ -1843,9 +1851,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private JSONObject getSingleInfo(Long companyId, Long accountId, Long chatId)
     {
-        StringBuilder singleSqlSB = new StringBuilder()
-            .append(
-                "select chat.id,setting.relative_receiver as receiver_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,2 as chat_type,emp.employee_name,emp.picture from im_single_settings setting,im_single_chat chat,acountinfo acc,employee_")
+        StringBuilder singleSqlSB = new StringBuilder().append(
+            "select chat.id,setting.relative_receiver as receiver_id,setting.update_time, setting.top_status,setting.no_bother,setting.is_hide,2 as chat_type,emp.employee_name,emp.picture from im_single_settings setting,im_single_chat chat,acountinfo acc,employee_")
             .append(companyId)
             .append(" emp where setting.employee_id = ")
             .append(accountId)
@@ -1934,9 +1941,8 @@ public class ImChatServiceImpl implements ImChatService
      */
     private int savePatchAssitantSetting(List<Object[]> insertData)
     {
-        StringBuilder batchSettingSqlSB = new StringBuilder().append("insert into ")
-            .append(IM_ASSISTANT_SETTINGS)
-            .append(" (assistant_id,employee_id,create_time,update_time,company_id,is_hide) values (?, ?, ?, ?, ?, ?)");
+        StringBuilder batchSettingSqlSB = new StringBuilder().append("insert into ").append(IM_ASSISTANT_SETTINGS).append(
+            " (assistant_id,employee_id,create_time,update_time,company_id,is_hide) values (?, ?, ?, ?, ?, ?)");
         int result = DAOUtil.executeBatchUpdate(batchSettingSqlSB.toString(), insertData);
         if (result > 0)
         {
@@ -1975,7 +1981,7 @@ public class ImChatServiceImpl implements ImChatService
     {
         List<JSONObject> sortedList = new ArrayList<JSONObject>();
         int size = list.size();
-        long tem = 0l;
+        long tem = 0L;
         JSONObject obj;
         for (int i = 0; i < size; i++)
         {
@@ -1990,7 +1996,7 @@ public class ImChatServiceImpl implements ImChatService
             }
             list.remove(obj);
             sortedList.add(obj);
-            tem = 0l;
+            tem = 0L;
         }
         return sortedList;
     }
@@ -2016,10 +2022,9 @@ public class ImChatServiceImpl implements ImChatService
      */
     private JSONObject getEmployeeInfoBySignId(Long companyId, Long principal)
     {
-        StringBuilder principalNameSB = new StringBuilder().append("SELECT emp.employee_name FROM acountinfo ac,employee_")
-            .append(companyId)
-            .append(" emp WHERE ac.employee_id = emp. ID AND ac. ID =")
-            .append(principal);
+        StringBuilder principalNameSB =
+            new StringBuilder().append("SELECT emp.employee_name FROM acountinfo ac,employee_").append(companyId).append(" emp WHERE ac.employee_id = emp. ID AND ac. ID =").append(
+                principal);
         return DAOUtil.executeQuery4FirstJSON(principalNameSB.toString());
     }
     
@@ -2080,7 +2085,7 @@ public class ImChatServiceImpl implements ImChatService
                 .append(accountId)
                 .append(" and company_id = ")
                 .append(companyId);
-                
+            
         }
         int updateResult = DAOUtil.executeUpdate(updateSqlSB.toString());
         if (updateResult <= 0)
@@ -2107,9 +2112,8 @@ public class ImChatServiceImpl implements ImChatService
                     beanSB.append(",");
                 }
             }
-            assistantSqlSB
-                .append(
-                    "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pr.read_status FROM im_assistant ia, push_message_content_")
+            assistantSqlSB.append(
+                "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pr.read_status FROM im_assistant ia, push_message_content_")
                 .append(companyId)
                 .append(" pmc,push_relevent_info_")
                 .append(companyId)
@@ -2123,9 +2127,8 @@ public class ImChatServiceImpl implements ImChatService
         }
         else
         {
-            assistantSqlSB
-                .append(
-                    "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
+            assistantSqlSB.append(
+                "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
                 .append(companyId)
                 .append(" pmc,push_relevent_info_")
                 .append(companyId)
@@ -2147,9 +2150,8 @@ public class ImChatServiceImpl implements ImChatService
     
     private String getChatAssistantSQL(Long companyId, Long assisstantId, Long accountId, Long showType)
     {
-        StringBuilder assistantSqlSB = new StringBuilder()
-            .append(
-                "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
             .append(companyId)
             .append(" pmc,push_relevent_info_")
             .append(companyId)
@@ -2170,9 +2172,8 @@ public class ImChatServiceImpl implements ImChatService
     
     private String getApproveAssistantSQL(Long companyId, Long assisstantId, Long accountId, Long showType)
     {
-        StringBuilder assistantSqlSB = new StringBuilder()
-            .append(
-                "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pmc.param_fields,pr.read_status FROM im_assistant ia, push_message_content_")
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pmc.param_fields,pr.read_status FROM im_assistant ia, push_message_content_")
             .append(companyId)
             .append(" pmc,push_relevent_info_")
             .append(companyId)
@@ -2193,9 +2194,31 @@ public class ImChatServiceImpl implements ImChatService
     
     private String getLibAssistantSQL(Long companyId, Long assisstantId, Long accountId, Long showType)
     {
-        StringBuilder assistantSqlSB = new StringBuilder()
-            .append(
-                "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
+            .append(companyId)
+            .append(" pmc,push_relevent_info_")
+            .append(companyId)
+            .append(" pr WHERE ia. ID = ")
+            .append(assisstantId)
+            .append(" AND ia.id = pmc.assistant_id AND pr.sign_id = ")
+            .append(accountId)
+            .append(" AND pr.push_message_id = pmc.id");
+        // 如果设置为只查看未读，则过滤结果
+        if (showType == 1)
+        {
+            assistantSqlSB.append(" AND pr.read_status = 0");
+        }
+        
+        assistantSqlSB.append(" order by pmc.datetime_create_time desc");
+        return assistantSqlSB.toString();
+    }
+    
+    
+    private String getCommonAssistantSQL(Long companyId, Long assisstantId, Long accountId, Long showType)
+    {
+        StringBuilder assistantSqlSB = new StringBuilder().append(
+            "SELECT pmc. ID,pmc.assistant_id,pmc.push_content,pmc.bean_name,pmc.bean_name_chinese,pmc.datetime_create_time,pmc.data_id,pmc.type,pmc.style,pr.read_status FROM im_assistant ia, push_message_content_")
             .append(companyId)
             .append(" pmc,push_relevent_info_")
             .append(companyId)
@@ -2360,7 +2383,7 @@ public class ImChatServiceImpl implements ImChatService
         StringBuilder queryAssistantSqlSB =
             new StringBuilder().append("select id from ").append(IM_ASSISTANT).append(" where company_id = ").append(companyId).append(" and type = 2");
         JSONObject assistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         JSONObject pushContent = new JSONObject();
         pushContent.put("type", type);
         pushContent.put("push_content", content);
@@ -2452,12 +2475,12 @@ public class ImChatServiceImpl implements ImChatService
     }
     
     @Override
-    public boolean modifyPushMessageContent(String token, Long id, String param)
+    public boolean modifyPushMessageContent(String token, Long id, String paramValue, String paramWhere)
     {
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         StringBuilder updateSQLSB = new StringBuilder().append("update push_message_content_").append(companyId);
-        updateSQLSB.append(" set param_fields = '").append(param).append("' where id = ").append(id);
+        updateSQLSB.append(" set param_fields = '").append(paramValue).append("' where param_fields = '").append(paramWhere).append("'");
         int result = DAOUtil.executeUpdate(updateSQLSB.toString());
         if (result <= 0)
         {
@@ -2477,5 +2500,28 @@ public class ImChatServiceImpl implements ImChatService
         String clearSql =
             "delete from im_assistant_settings where id in (select min(id) from im_assistant_settings group by assistant_id,employee_id,company_id having count(*) > 1)";
         DAOUtil.executeUpdate(clearSql);
+    }
+    
+    @Override
+    public boolean updateGroupManager(String token, String signId)
+    {
+        InfoVo info = TokenMgr.obtainInfo(token);
+        Long companyId = info.getCompanyId();
+        if (StringUtils.isEmpty(signId))
+        {
+            log.error("updateGroupManager:there is no principal......");
+        }
+        StringBuilder updateSqlSB = new StringBuilder().append("update ").append(IM_GROUP_CHAT);
+        updateSqlSB.append(" set principal = ? where company_id = ? and type = ?");
+        List<Object> updateData = new ArrayList<>();
+        updateData.add(Long.valueOf(signId));
+        updateData.add(companyId);
+        updateData.add(ImConstant.CONSTANT_ZERO);
+        int updateResult = DAOUtil.executeUpdate(updateSqlSB.toString(), updateData.toArray());
+        if (updateResult <= 0)
+        {
+            return false;
+        }
+        return true;
     }
 }

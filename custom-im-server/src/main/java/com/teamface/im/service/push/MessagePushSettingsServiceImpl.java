@@ -13,7 +13,6 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.mongodb.BasicDBObject;
 import com.mongodb.QueryOperators;
-import com.mongodb.client.MongoCursor;
 import com.teamface.common.constant.Constant;
 import com.teamface.common.util.JsonResUtil;
 import com.teamface.common.util.QuartzManager;
@@ -54,32 +53,21 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
     {
         InfoVo info = TokenMgr.obtainInfo(token);
         JSONObject settingJson = JSONObject.parseObject(settingsJson);
+        settingJson.put("jobTime", String.valueOf(System.currentTimeMillis()));
         Long companyId = info.getCompanyId();
-        Long pushType = settingJson.getLong("push_type_id");
-        String beanName = settingJson.getString("bean_name");
         settingJson.put("company_id", companyId);
-        Document queryDoc = new Document();
-        queryDoc.put("company_id", companyId);
-        queryDoc.put("push_type_id", String.valueOf(pushType));
-        queryDoc.put("bean_name", beanName);
-        queryDoc.put("setting_status", 0);
-        // 查询数据
-        MongoCursor<Document> mcDoc = mongoDB.find(Constant.PUSH_SETTINGS_COLLECTION, queryDoc);
-        if (mcDoc.hasNext())
-        {
-            return JsonResUtil.getResultJsonByIdent("postprocess.push.setting.repeat.error");
-        }
         Document doc = new Document();
         doc.putAll(settingJson);
         mongoDB.insert(Constant.PUSH_SETTINGS_COLLECTION, doc);
         JSONObject alertMethod = settingJson.getJSONObject("alert_method");
-        Short pushMethod = 0;
+        Short pushMethod = 0;// 1事件触发推送,2定时任务推送
         if (!alertMethod.getString("push_method").isEmpty())
         {
             pushMethod = alertMethod.getShort("push_method");
         }
         if (pushMethod == ImConstant.PUSH_SETTING_CONDITION_TIMER)
         {
+            // 增加一个定时任务
             addTimerTask(settingJson);
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -132,8 +120,9 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
         mongoDB.updateById(Constant.PUSH_SETTINGS_COLLECTION, settingId, doc);
         JSONObject settingInfo = JSONObject.parseObject(mcDoc.toJson());
         Short pushTypeId = settingInfo.getShort("push_type_id");
-        String jobName = PushJobUtil.getJobName(pushTypeId) + "_" + companyId;
-        String triggerName = PushJobUtil.getJobTrigger(pushTypeId) + "_" + companyId;
+        String jobTime = doc.getString("jobTime");
+        String jobName = PushJobUtil.getJobName(pushTypeId) + "_" + jobTime + "_" + companyId;
+        String triggerName = PushJobUtil.getJobTrigger(pushTypeId) + "_" + jobTime + "_" + companyId;
         JSONObject alertMethod = settingInfo.getJSONObject("alert_method");
         Short pushMethod = 0;
         if (!alertMethod.getString("push_method").isEmpty())
@@ -195,8 +184,9 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
         mongoDB.updateById(Constant.PUSH_SETTINGS_COLLECTION, settingId, doc);
         JSONObject settingInfo = JSONObject.parseObject(mcDoc.toJson());
         Short pushTypeId = settingInfo.getShort("push_type_id");
-        String jobName = PushJobUtil.getJobName(pushTypeId) + "_" + companyId;
-        String triggerName = PushJobUtil.getJobTrigger(pushTypeId) + "_" + companyId;
+        String jobTime = doc.getString("jobTime");
+        String jobName = PushJobUtil.getJobName(pushTypeId) + "_" + jobTime + "_" + companyId;
+        String triggerName = PushJobUtil.getJobTrigger(pushTypeId) + "_" + jobTime + "_" + companyId;
         JSONObject alertMethod = settingInfo.getJSONObject("alert_method");
         Short pushMethod = 0;
         if (!StringUtil.isEmpty(alertMethod.getString("push_method")))
@@ -241,20 +231,18 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
      */
     private void addTimerTask(JSONObject setting)
     {
-        Short pushTypeId = setting.getShort("push_type_id");
+        Short pushTypeId = setting.getShort("push_type_id");// 触发事件类型id
         JSONObject timerSetting = setting.getJSONObject("timer_setting");
         Long companyId = setting.getLongValue("company_id");
         String cronExpression = processCronSettings(timerSetting);
         String jobName = PushJobUtil.getJobName(pushTypeId);
-        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(companyId);
+        String jobTime = setting.getString("jobTime");
+        // 需唯一
+        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(jobTime).append("_").append(companyId);
         String triggerName = PushJobUtil.getJobTrigger(pushTypeId);
-        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(companyId);
-        QuartzManager.getInstance().addJob(jobNameSB.toString(),
-            Constant.PUSH_JOB_GROUP_NAME,
-            triggerNameSB.toString(),
-            Constant.PUSH_JOB_TRIGGER_GROUP_NAME,
-            PushMessageJob.class,
-            cronExpression);
+        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(jobTime).append("_").append(companyId);
+        QuartzManager.getInstance()
+            .addJob(jobNameSB.toString(), Constant.PUSH_JOB_GROUP_NAME, triggerNameSB.toString(), Constant.PUSH_JOB_TRIGGER_GROUP_NAME, PushMessageJob.class, cronExpression);
     }
     
     private void addTimerTaskForEdit(JSONObject setting, Long companyId)
@@ -263,15 +251,13 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
         JSONObject timerSetting = setting.getJSONObject("timer_setting");
         String cronExpression = processCronSettings(timerSetting);
         String jobName = PushJobUtil.getJobName(pushTypeId);
-        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(companyId);
+        String jobTime = setting.getString("jobTime");
+        // 需唯一
+        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(jobTime).append("_").append(companyId);
         String triggerName = PushJobUtil.getJobTrigger(pushTypeId);
-        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(companyId);
-        QuartzManager.getInstance().addJob(jobNameSB.toString(),
-            Constant.PUSH_JOB_GROUP_NAME,
-            triggerNameSB.toString(),
-            Constant.PUSH_JOB_TRIGGER_GROUP_NAME,
-            PushMessageJob.class,
-            cronExpression);
+        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(jobTime).append("_").append(companyId);
+        QuartzManager.getInstance()
+            .addJob(jobNameSB.toString(), Constant.PUSH_JOB_GROUP_NAME, triggerNameSB.toString(), Constant.PUSH_JOB_TRIGGER_GROUP_NAME, PushMessageJob.class, cronExpression);
     }
     
     /**
@@ -286,14 +272,13 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
         Long companyId = setting.getLongValue("company_id");
         String cronExpression = processCronSettings(timerSetting);
         String jobName = PushJobUtil.getJobName(pushTypeId);
-        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(companyId);
+        String jobTime = setting.getString("jobTime");
+        // 需唯一
+        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(jobTime).append("_").append(companyId);
         String triggerName = PushJobUtil.getJobTrigger(pushTypeId);
-        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(companyId);
-        QuartzManager.getInstance().modifyJobTime(jobNameSB.toString(),
-            Constant.PUSH_JOB_GROUP_NAME,
-            triggerNameSB.toString(),
-            Constant.PUSH_JOB_TRIGGER_GROUP_NAME,
-            cronExpression);
+        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(jobTime).append("_").append(companyId);
+        QuartzManager.getInstance()
+            .modifyJobTime(jobNameSB.toString(), Constant.PUSH_JOB_GROUP_NAME, triggerNameSB.toString(), Constant.PUSH_JOB_TRIGGER_GROUP_NAME, cronExpression);
     }
     
     /**
@@ -343,6 +328,8 @@ public class MessagePushSettingsServiceImpl implements MessagePushSettingsServic
                 return QuartzCronExpressionUtil.getWeekCronExpression(minutes, hour, week, frequency);
             case 4:
                 return QuartzCronExpressionUtil.getYearCronExpression(minutes, hour, day, week, month, frequency);
+            default:
+                break;
         }
         return QuartzCronExpressionUtil.generatePlainCronExpression(minutes, hour, day, week, month);
     }

@@ -609,7 +609,6 @@ public class ExcelUtil
                         josn.put("trigger", 0);
                         josn.put("id", jsonObject);
                         rabbitMQServer.sendMessage("allot", josn.toJSONString());
-                        JobManager.getInstance().submitJob(new FirstThread());
                     }
                 }
             }

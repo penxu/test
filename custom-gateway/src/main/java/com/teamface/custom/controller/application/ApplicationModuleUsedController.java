@@ -19,7 +19,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.constant.DataTypes;
 import com.teamface.common.model.ServiceResult;
 import com.teamface.common.util.JsonResUtil;
-import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.custom.service.application.ApplicationModuleUsedAppService;
 
 /**

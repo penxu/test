@@ -2,8 +2,6 @@ package com.teamface.im.service.push.job;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.bson.Document;
 import org.quartz.Job;
@@ -17,7 +15,7 @@ import com.teamface.common.util.QuartzManager;
 import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.im.constant.ImConstant;
 import com.teamface.im.dao.PushReleventInfoDAO;
-import com.teamface.im.service.push.MessagePushServiceAbstract;
+import com.teamface.im.service.push.BaseMessagePushService;
 import com.teamface.im.util.PushJobUtil;
 
 /**
@@ -26,7 +24,7 @@ import com.teamface.im.util.PushJobUtil;
  * @date: 2017年12月12日 上午11:21:37
  * @version: 1.0
  */
-public class PushMessageJob extends MessagePushServiceAbstract implements Job
+public class PushMessageJob extends BaseMessagePushService implements Job
 {
     // 当前布局自定义推送设置信息
     private static JSONObject customPushSetting;
@@ -37,13 +35,7 @@ public class PushMessageJob extends MessagePushServiceAbstract implements Job
     {
         // 获取公司ID
         String jobName = context.getJobDetail().getKey().getName();
-        Pattern r = Pattern.compile("(\\d+)");
-        Matcher m = r.matcher(jobName);
-        String companyId = "";
-        if (m.find())
-        {
-            companyId = m.group(1);
-        }
+        String companyId = jobName.substring(jobName.lastIndexOf("_") + 1, jobName.length());
         String tableName = DAOUtil.getTableName(pushMessageTabel, companyId);
         StringBuilder queryMessageSB = new StringBuilder().append("select * from ").append(tableName).append(" where job_name = '").append(jobName).append("';");
         // 查询满足推送条件的数据
@@ -54,8 +46,14 @@ public class PushMessageJob extends MessagePushServiceAbstract implements Job
             boolean settingValidation = getCustomPushSetting(settingJson);
             if (!settingValidation)
             {
+                System.err.println("没有查询推送规则布局！");
                 return;
             }
+        }
+        else
+        {
+            System.err.println("没有查询满足推送条件的数据！");
+            return;
         }
         for (JSONObject objJson : objList)
         {
@@ -68,7 +66,8 @@ public class PushMessageJob extends MessagePushServiceAbstract implements Job
         if (alertEndType == ImConstant.TIMER_SETTING_DATE)
         {
             Short pushType = customPushSetting.getShort("push_type_id");
-            validateTimberDeadline(pushType, Long.valueOf(companyId), alertEndContent);
+            String jobTime = customPushSetting.getString("jobTime");
+            validateTimberDeadline(pushType, jobTime, Long.valueOf(companyId), alertEndContent);
         }
     }
     
@@ -172,6 +171,17 @@ public class PushMessageJob extends MessagePushServiceAbstract implements Job
                 obj.add(currentTime);
                 obj.add(currentTime);
                 insertData.add(obj.toArray());
+                
+                StringBuilder updateSqlSB = new StringBuilder();
+                updateSqlSB.append("update im_assistant_settings")
+                    .append(" set is_hide = 0")
+                    .append(" where assistant_id = ")
+                    .append(jsonContent.getString("assistant_id"))
+                    .append(" and employee_id = ")
+                    .append(people)
+                    .append(" and company_id = ")
+                    .append(companyId);
+                DAOUtil.executeUpdate(updateSqlSB.toString());
             }
             PushReleventInfoDAO.batchSave(companyId, insertData);
             for (String people : alertPeoples)
@@ -206,13 +216,13 @@ public class PushMessageJob extends MessagePushServiceAbstract implements Job
      * @return
      * @Description:验证定时的时效
      */
-    private void validateTimberDeadline(Short pushTypeId, Long companyId, String value)
+    private void validateTimberDeadline(Short pushTypeId, String jobTime, Long companyId, String value)
     {
         
         String jobName = PushJobUtil.getJobName(pushTypeId);
-        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(companyId);
+        StringBuilder jobNameSB = new StringBuilder().append(jobName).append("_").append(jobTime).append("_").append(companyId);
         String triggerName = PushJobUtil.getJobTrigger(pushTypeId);
-        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(companyId);
+        StringBuilder triggerNameSB = new StringBuilder().append(triggerName).append("_").append(jobTime).append("_").append(companyId);
         // 设置为日期时则判断当前时间
         
         long currentTime = System.currentTimeMillis();

@@ -121,6 +121,14 @@ public interface WorkflowAppService
     JSONObject getProcessAttributeByBeanForCreate(String moduleBean, String token);
     
     /**
+     * @param moduleBean
+     * @param token
+     * @return JSONObject
+     * @Description:根据bean获取流程属性信息(修改用)
+     */
+    JSONObject getProcessAttributeByBeanForUpdate(String dataId, String moduleBean, String token);
+    
+    /**
      * @param taskKey
      * @param moduleBean
      * @param token
@@ -139,13 +147,12 @@ public interface WorkflowAppService
     JSONObject getProcessAttributeByVersion(String moduleBean, Long dataId, String token);
     
     /**
-     * @param processInstanceId
-     * @param processId
      * @param companyId
+     * @param moduleBean
      * @return boolean
-     * @Description:更新流程实例id
+     * @Description:更新流程信息
      */
-    boolean modifyProcessInstanceId(String processInstanceId, Long processId, Long companyId);
+    boolean modifyProcessInfo(Long companyId, String moduleBean, String moduleName);
     
     /**
      * @param moduleBean
@@ -198,14 +205,6 @@ public interface WorkflowAppService
      * @Description: 获取下一节点审批人
      */
     String getNextTaskAssigne(Map<String, String> paramsMap);
-    
-    /**
-     * @param saveJson
-     * @param paramsJson
-     * @return ServiceResult
-     * @Description:模块进入流程处理器
-     */
-    ServiceResult<String> moduleForProcessEntryHandle(JSONObject saveJson, JSONObject paramsJson);
     
     /**
      * @param saveJson

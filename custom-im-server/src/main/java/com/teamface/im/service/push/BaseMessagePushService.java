@@ -29,7 +29,7 @@ import com.teamface.im.util.DynamicParameterUtil;
  * @version: 1.0
  */
 
-public abstract class MessagePushServiceAbstract
+public abstract class BaseMessagePushService
 {
     protected static final MongoDBUtil mongoDB = MongoDBUtil.getInstance(Constant.DB_NAME);
     
@@ -121,11 +121,23 @@ public abstract class MessagePushServiceAbstract
             if (selectedType == ImConstant.STRUCTURE_TYPE_DYNAMIC)
             {
                 String fieldValue = peopleJson.getString("identifer");
-                if(!Objects.isNull(fieldValue)){
-                    if (fieldValue.lastIndexOf(ImConstant.PERSONEL_SHARE_SELECTED) > ImConstant.CONSTANT_ZERO && pushType == ImConstant.PUSH_SETTING_TRIGGER_SHARE)
+                if (!Objects.isNull(fieldValue))
+                {
+                    if (fieldValue.lastIndexOf(ImConstant.PERSONEL_SHARE_SELECTED) > ImConstant.CONSTANT_ZERO)
                     {
-                        List<String> signTem = DynamicParameterUtil.getShareSignIdByField(fieldValue, beanName, companyId, id);
-                        alertPeoples.addAll(signTem);
+                        if (pushType == ImConstant.PUSH_SETTING_TRIGGER_SHARE)
+                        {
+                            List<String> signTem = DynamicParameterUtil.getShareSignIdByField(fieldValue, beanName, companyId, id);
+                            alertPeoples.addAll(signTem);
+                        }
+                        else if (pushType == ImConstant.PUSH_SETTING_TRIGGER_TRANSFER)
+                        {
+                            Long signId = DynamicParameterUtil.getTransferSignIdByField(beanName, companyId, id);
+                            if (null != signId)
+                            {
+                                alertPeoples.add(String.valueOf(signId));
+                            }
+                        }
                     }
                     else if (fieldValue.lastIndexOf(ImConstant.PERSONEL_SUPERIOR_SUFFIX) > ImConstant.CONSTANT_ZERO)
                     {
@@ -182,7 +194,7 @@ public abstract class MessagePushServiceAbstract
         showField.put("type", 3);
         String bean = beanName.split("_")[0];
         JSONObject moduleJson = queryModuleInfo(bean, companyId);
-        Long applicationId = 0l;
+        Long applicationId = 0L;
         String beanNameChinese = "";
         if (null != moduleJson)
         {
@@ -199,7 +211,7 @@ public abstract class MessagePushServiceAbstract
             .append(applicationId)
             .append(" and type = 1");
         JSONObject queryAssistantObj = DAOUtil.executeQuery4FirstJSON(queryAssistantSqlSB.toString());
-        Long assistantId = 0l;
+        Long assistantId = 0L;
         if (null != queryAssistantObj)
         {
             assistantId = queryAssistantObj.getLongValue("id");
@@ -225,7 +237,10 @@ public abstract class MessagePushServiceAbstract
         int contentInsertResult = DAOUtil.executeUpdate(contentInsertSqlSB.toString());
         
         if (contentInsertResult > 0)
+        {
             currentContentId = BusinessDAOUtil.geCurrval4Table("push_message_content", companyId.toString());
+        }
+        
         List<JSONObject> fieldInfoList = new ArrayList<>();
         JSONObject fieldInfo;
         List<Object[]> insertData = new ArrayList<>();
@@ -284,9 +299,14 @@ public abstract class MessagePushServiceAbstract
         JSONObject json = new JSONObject();
         json.put("id", id);
         if (pushType == 5)
+        {
             json.put("del_status", 1);
+        }
         else
+        {
             json.put("del_status", 0);
+        }
+        
         JSONObject whereJson = new JSONObject();
         whereJson.put("where", json);
         String bean = beanName.split("_")[0];

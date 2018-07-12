@@ -66,10 +66,10 @@ public class ImCircleComment extends BaseVo implements java.io.Serializable
         this.receiverId = receiverId;
     }
     
+    @Override
     public String toString()
     {
-        return "[" + "senderId:" + getSenderId() + "," + "contentInfo:"
-            + getContentInfo() + "," + "circleMainId:" + getCircleMainId() + ","
-            + "receiverId:" + getReceiverId() + "," + "]";
+        return "[" + "senderId:" + getSenderId() + "," + "contentInfo:" + getContentInfo() + "," + "circleMainId:" + getCircleMainId() + "," + "receiverId:" + getReceiverId() + ","
+            + "]";
     }
 }

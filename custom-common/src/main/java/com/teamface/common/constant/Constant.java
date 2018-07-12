@@ -56,7 +56,7 @@ public class Constant
     // 9
     public static final int CURRENCY_NINE = 9;
     
-    /************************** REDIS *****************************************/
+    /************************** REDIS ******************************************/
     
     public static final String REDIS_KEY_SUFFIX = comment.getString("redis.key_suffix", "dt_");
     
@@ -70,7 +70,7 @@ public class Constant
     
     public static final String REDIS_HOST = config.getString("redis.host");
     
-    public static final int REDIS_PORT = config.getInt("redis.port");
+    public static final int REDIS_PORT = config.getInt("redis.port", 0);
     
     public static final String REDIS_PASSWORD = config.getString("redis.password");
     
@@ -118,7 +118,7 @@ public class Constant
     public static final String PUSH_JOB_TRIGGER_GROUP_NAME = "PUSH_MESSAGE_TRRIGER";
     
     // 推送队列名
-    public static final String PUSH_THREAD_QUEUE_NAME = "push_message_im_202";
+    public static final String PUSH_THREAD_QUEUE_NAME = "push_message_im_172";
     
     // 推送账号
     public static final Long PUSH_ACCOUNT = 9996l;
@@ -557,6 +557,9 @@ public class Constant
     // 操作日志 查看
     public static final int AUTH_TWENTY_FIVE = 25;
     
+    // 启用 查看
+    public static final int AUTH_TWENTY_SIX = 26;
+    
     /**************************
      * MongoDB
      *****************************************/
@@ -580,7 +583,7 @@ public class Constant
     public static final String STANDARD_RELATION = "standard";
     
     // 获取数据库名称
-    public static final String DB_NAME = config.getString("mongoDB.dbname");
+    public static final String DB_NAME = comment.getString("mongoDB.dbname");
     
     // 获取详情布局集合
     public static final String DETAIL_COLLECTION = comment.getString("mongoDB.detailLayoutColl");
@@ -739,6 +742,17 @@ public class Constant
     // 共享权限 读 写
     public static final String SHARE_DATA_AUTH_WRITE = "1";
     
+     // 文档后缀类型
+    public static final String  FILE_TYPE_SUFFIX = "doc,txt,pdf,wps";
+    
+    // 视频后缀类型
+    public static final String  VIDEO_TYPE_SUFFIX = "wmv,asf,asx,rm,rmvb,mpg,mpeg,mpe,3gp,mov,mp4,m4v,avi,dat,mkv,flv,vob";
+    
+    // 图片后缀类型
+    public static final String  PICTURE_TYPE_SUFFIX = "bmp,jpg,png,tiff,gif,pcx,tga,exif,fpx,svg,psd,cdr,pcd,dxf,ufo,eps,ai,raw,wmf,webp";
+    
+    // 音频后缀类型
+    public static final String  AUDIO_TYPE_SUFFIX = "mp3,wma,ape,wav,midi,au,aif,ra,rm,rmx";
     // 共享权限只读 写 删
     public static final String SHARE_DATA_AUTH_DEL = "2";
     
@@ -767,6 +781,9 @@ public class Constant
     public static final String DASHBOARD_TYPE = "dashboard";// 仪表盘
     
     public static final String REPORT_TYPE = "report";// 报表
+    
+    // 自动化队列名
+    public static final String AUTOMATION_THREAD_QUEUE_NAME = "allot";
     
     static
     {

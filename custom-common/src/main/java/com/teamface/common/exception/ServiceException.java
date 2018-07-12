@@ -12,22 +12,15 @@ import com.teamface.common.model.Response;
 public class ServiceException extends Exception
 {
     
-    /**
-     * serial_number
-     */
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = -6518885832782981810L;
     
-    /**
-     * 错误信息
-     */
+    // 错误信息
     private String errorMessage = null;
     
-    /**
-     * 概括错误信息
-     */
+    // 概括错误信息
     private String errorTitle = null;
     
-    /** 错误类型，缺省为0 */
+    // 错误类型，缺省为0
     private int errorType = 0;
     
     private Response response = null;
@@ -35,7 +28,7 @@ public class ServiceException extends Exception
     private String errorCode = null;
     
     /**
-     * TFServiceException构造函数
+     * ServiceException构造函数
      */
     public ServiceException()
     {
@@ -44,7 +37,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      */
@@ -55,7 +48,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      */
@@ -68,7 +61,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      */
@@ -89,7 +82,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      */
@@ -102,7 +95,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      * @param argThr
@@ -113,7 +106,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      * @param argThr
@@ -125,7 +118,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数根据传递的异常信息
+     * ServiceException构造函数根据传递的异常信息
      * 
      * @param argMessage
      * @param argThr
@@ -138,7 +131,7 @@ public class ServiceException extends Exception
     }
     
     /**
-     * TFServiceException构造函数通过传递异常对象
+     * ServiceException构造函数通过传递异常对象
      * 
      * @param argThr
      */
@@ -146,20 +139,6 @@ public class ServiceException extends Exception
     {
         super(argThr);
         this.errorMessage = argThr.getLocalizedMessage();
-    }
-    
-    /**
-     * 当该异常被打印出来的时候执行
-     * 
-     * @return String
-     */
-    public String toString()
-    {
-        StringBuffer sqlString = new StringBuffer("【SERVER异常信息:】\n");
-        sqlString.append("****************************************TFServiceException Start****************************************\n");
-        sqlString.append(errorMessage);
-        sqlString.append("\n****************************************TFServiceException End****************************************");
-        return sqlString.toString();
     }
     
     public int getErrorType()

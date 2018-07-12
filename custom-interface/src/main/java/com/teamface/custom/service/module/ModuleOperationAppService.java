@@ -58,8 +58,7 @@ public interface ModuleOperationAppService
      * @return ServiceResult
      * @Description:保存业务数据
      */
-    public ServiceResult<String> saveData(Object requestObj, String token, String clientFlag)
-        throws Exception;
+    public ServiceResult<String> saveData(Object requestObj, String token, String clientFlag);
         
     /**
      * @param requestBean
@@ -100,7 +99,7 @@ public interface ModuleOperationAppService
      * @return JSONObject
      * @Description:获取业务数据关联关系
      */
-    public List<JSONObject> findDataRelationsForPc(String token, String bean, String clientFlag);
+    public List<JSONObject> findDataRelationsForPc(String token, String bean, String clientFlag, String flag);
     
     /**
      * @param requestBean
@@ -186,12 +185,15 @@ public interface ModuleOperationAppService
     public List<JSONObject> findRelationDataList(JSONObject reqJson, String token, String clientFlag);
     
     /**
+     * 
      * @param dataId
-     * @param token
-     * @return List
+     * @param companyId
+     * @param key
+     * @param bean
+     * @return
      * @Description:获取附件
      */
-    public List<JSONObject> findAttachmentList(Integer dataId, Long companyId, String key);
+    public List<JSONObject> findAttachmentList(Integer dataId, Long companyId, String key, String bean, boolean approvalFlag, int idx);
     
     /**
      * @param reqJson
@@ -241,4 +243,12 @@ public interface ModuleOperationAppService
      */
     public List<JSONObject> getFirstFieldFromModule(JSONObject reqJson, String token);
     
+    /**
+     * 
+     * @param token
+     * @param bean
+     * @return
+     * @Description:根据bean获取模块id
+     */
+    public String getModuleIdByModule(String token, String bean);
 }

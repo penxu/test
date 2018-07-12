@@ -109,26 +109,12 @@ public class ProjectManagementWorkflowController
      * @param token 请求凭证
      * @param requestPara 请求参数
      * @return
-     * @Description: 删除流程设置
+     * @Description:
      */
     @RequestMapping(value = "/delete", method = RequestMethod.POST, consumes = "application/json")
     public @ResponseBody JSONObject delete(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token, @RequestBody(required = true) JSONObject requestPara)
     {
         ServiceResult<String> returnMSG = projectManagementWorkflowService.delete(token, requestPara);
-        return JsonResUtil.getResultJsonObject(returnMSG.getCode(), returnMSG.getObj());
-    }
-    
-    /**
-     * 
-     * @param token 请求凭证
-     * @param requestPara 请求参数
-     * @return
-     * @Description: 校验人员使用流程权限
-     */
-    @RequestMapping(value = "/checkPrivillege", method = RequestMethod.POST, consumes = "application/json")
-    public @ResponseBody JSONObject checkPrivillege(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token, @RequestBody(required = true) JSONObject requestPara)
-    {
-        ServiceResult<String> returnMSG = projectManagementWorkflowService.checkPrivillege(token, requestPara);
         return JsonResUtil.getResultJsonObject(returnMSG.getCode(), returnMSG.getObj());
     }
 }

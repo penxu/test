@@ -345,7 +345,7 @@ public class ApplicationCenterAppServiceImpl implements ApplicationCenterAppServ
             }
             
             // 应用模版安装记录
-            boolean saveInstallResult = this.saveInstallRecord(templateId, employeeId);
+            boolean saveInstallResult = this.saveInstallRecord(templateId, employeeId,companyId);
             if (!saveInstallResult)
             {
                 log.debug("保存应用模版安装记录失败！");
@@ -2174,17 +2174,19 @@ public class ApplicationCenterAppServiceImpl implements ApplicationCenterAppServ
     /**
      * @param applicationTemplateId
      * @param employeeId
+     * @param companyId 
      * @return
      * @Description:保存安装记录
      */
-    private boolean saveInstallRecord(Integer applicationTemplateId, Long employeeId)
+    private boolean saveInstallRecord(Integer applicationTemplateId, Long employeeId, Long companyId)
     {
         try
         {
             StringBuilder insertSql = new StringBuilder();
-            insertSql.append("insert into application_template_install(template_id, install_by, install_time) values(");
+            insertSql.append("insert into application_template_install(template_id, install_by,company_id, install_time) values(");
             insertSql.append(applicationTemplateId).append(", ");
             insertSql.append(employeeId).append(", ");
+            insertSql.append(companyId).append(", ");
             insertSql.append(System.currentTimeMillis()).append(")");
             
             int insertResult = DAOUtil.executeUpdate(insertSql.toString());
@@ -2623,8 +2625,7 @@ public class ApplicationCenterAppServiceImpl implements ApplicationCenterAppServ
                 .append(reqMap.get("template_id"));
             object = DAOUtil.executeQuery4FirstJSON(queryModuleSql.toString());
             StringBuilder querySql =
-                new StringBuilder(" select  count(*) from application_template_install  where template_id = " + reqMap.get("template_id")).append(" and install_by = ")
-                    .append(info.getEmployeeId());
+                new StringBuilder(" select  count(*) from application_template_install  where template_id = " + reqMap.get("template_id")).append(" and company_id = ").append(info.getCompanyId());
             int num = DAOUtil.executeCount(querySql.toString());
             StringBuilder countSql = new StringBuilder(" select COALESCE(AVG(star_level), 0)  from application_template_comment  where template_id = " + reqMap.get("template_id"));
             Object objectAvg = DAOUtil.executeQuery4Object(countSql.toString());

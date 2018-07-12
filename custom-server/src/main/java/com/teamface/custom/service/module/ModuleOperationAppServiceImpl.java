@@ -19,6 +19,7 @@ import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import com.alibaba.fastjson.JSON;
@@ -28,12 +29,12 @@ import com.alibaba.fastjson.TypeReference;
 import com.teamface.common.cache.ServiceResultCodeCache;
 import com.teamface.common.constant.Constant;
 import com.teamface.common.constant.RedisKey4Function;
+import com.teamface.common.exception.HjHqSystemException;
 import com.teamface.common.model.RequestBean;
 import com.teamface.common.model.ServiceResult;
 import com.teamface.common.mq.RabbitMQServer;
 import com.teamface.common.util.AuthUtil;
 import com.teamface.common.util.CustomUtil;
-import com.teamface.common.util.JobManager;
 import com.teamface.common.util.StringUtil;
 import com.teamface.common.util.activiti.ActivitiUtil;
 import com.teamface.common.util.dao.BusinessDAOUtil;
@@ -45,8 +46,6 @@ import com.teamface.common.util.dao.MongoDBUtil;
 import com.teamface.common.util.dao.SpecialJSONParser4SQL;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
-import com.teamface.custom.async.CustomAsyncHandle;
-import com.teamface.custom.service.Thread.FirstThread;
 import com.teamface.custom.service.auth.ModuleDataAuthAppService;
 import com.teamface.custom.service.auth.ModulePageAuthAppService;
 import com.teamface.custom.service.common.CommonAppService;
@@ -343,307 +342,199 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     @Override
     @Transactional
     public ServiceResult<String> saveData(Object requestObj, String token, String clientFlag)
-        throws Exception
     {
         log.debug(String.format(" saveData parameters{args0: %s},start!", requestObj.toString()));
         ServiceResult<String> serviceResult = new ServiceResult<>();
         JSONObject reqJson = JSONObject.parseObject(JSON.toJSONString(requestObj));
-        // 处理审批数据
-        String nextApproverBy = reqJson.getJSONObject("data").getString("personnel_approverBy");
-        reqJson.getJSONObject("data").remove("personnel_ccTo");// 先保留一段时间，等前端取消传参时再删除此行代码
-        reqJson.getJSONObject("data").remove("personnel_approverBy");
-        // 附件、图片
-        JSONObject handleResult = this.removeAttImgObj(reqJson);
-        JSONObject saveJson = handleResult.getJSONObject("saveJSON");
-        JSONObject attImgJson = handleResult.getJSONObject("attImgJSON");
-        
-        RequestBean requestBean = new RequestBean();
-        String beanName = reqJson.getString("bean");
-        String dataJsonStr = saveJson.getJSONObject("data").toString();
-        requestBean.setBean(beanName);
-        requestBean.setData(dataJsonStr);
-        
-        // 校验请求参数
-        if (StringUtil.isEmpty(beanName))
+        try
         {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), "param[requestBean.getBean]is null");
-            return serviceResult;
-        }
-        
-        if (StringUtil.isEmpty(dataJsonStr))
-        {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), "param[requestBean.getData]is null");
-            return serviceResult;
-        }
-        
-        // 解析token
-        InfoVo info = TokenMgr.obtainInfo(token);
-        Long companyId = info.getCompanyId();
-        Long employeeId = info.getEmployeeId();
-        
-        // 验证权限
-        serviceResult = moduleDataAuthAppService.checkOperateAuth(token, beanName, Constant.AUTH_ADD);
-        if (!serviceResult.isSucces())
-        {
-            return serviceResult;
-        }
-        
-        // 获取模块ID
-        StringBuilder queryModuleId = new StringBuilder();
-        queryModuleId.append("select id, chinese_name from ").append(DAOUtil.getTableName("application_module", companyId)).append(" where english_name='").append(beanName).append(
-            "'");
-        JSONObject jsonOj = DAOUtil.executeQuery4FirstJSON(queryModuleId.toString());
-        
-        // 获取流程属性
-        JSONObject processJson = workflowAppService.getProcessAttributeByBeanForCreate(beanName, token);
-        
-        // 获取新增数据id
-        long dataId = BusinessDAOUtil.getNextval4Table(beanName, companyId.toString());
-        
-        JSONObject customerLayout = LayoutUtil.getEnableFields(companyId.toString(), requestBean.getBean(), null);
-        
-        // 构造保存json
-        requestBean.setId(dataId);
-        JSONObject saveDataJson = JSONObject.parseObject(requestBean.getData());
-        JSONObject subformDataJson = new JSONObject();
-        subformDataJson.put("bean", requestBean.getBean());
-        subformDataJson.put("data", saveDataJson);
-        // 保存子表单数据
-        boolean subformResult = saveSubformData(customerLayout, subformDataJson, companyId.toString(), dataId, null == processJson ? false : true);
-        if (!subformResult)
-        {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
-            return serviceResult;
-        }
-        // 封装主干数据
-        buildingSaveData(customerLayout, saveDataJson, requestBean.getBean(), companyId, employeeId, dataId);
-        String reck = rechecking(customerLayout, saveDataJson, companyId, beanName, clientFlag);
-        if (!StringUtils.isEmpty(reck))
-        {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), reck.concat("存在重复的数据,请检查。"));
-            return serviceResult;
-        }
-        
-        if (null != processJson)
-        {
-            // 删除状态
-            saveDataJson.put(Constant.FIELD_DEL_STATUS, "0");
-            // 公海池id
-            saveDataJson.put(Constant.FIELD_SEAPOOL_ID, "0");
-            // 流程数据bean
-            saveDataJson.put("bean", beanName.concat("_approval"));
-        }
-        else
-        {
-            saveDataJson.put("bean", beanName);
-        }
-        if (saveDataJson.containsKey("data"))
-        {
-            saveDataJson.remove("data");
-        }
-        
-        JSONObject dataJson = new JSONObject();
-        dataJson.put("bean", saveDataJson.get("bean"));
-        if (saveDataJson.containsKey("bean"))
-        {
-            saveDataJson.remove("bean");
-        }
-        dataJson.put("data", saveDataJson.toJSONString());
-        // 获取插入数据sql
-        String insertSql = JSONParser4SQL.getInsertSql(dataJson, companyId.toString());
-        
-        // 保存业务数据
-        int count = DAOUtil.executeUpdate(insertSql);
-        if (count < 1)
-        {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
-            return serviceResult;
-        }
-        // 执行被引用字段相关的高级公式（当前数据保存到数据库后调用）
-        CustomUtil.executeSeniorformula(beanName, companyId.toString(), saveDataJson);
-        // 保存附件、图片
-        boolean attachmentResult = saveAttachmentData(attImgJson.toString(), companyId.toString(), dataId, token);
-        if (!attachmentResult)
-        {
-            serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
-            return serviceResult;
-        }
-        // 添加动态
-        JSONObject resultMap = new JSONObject();
-        resultMap.put("relation_id", dataId);
-        resultMap.put("datetime_time", System.currentTimeMillis());
-        StringBuilder information = new StringBuilder();
-        information.append(" 新建了 【".concat(jsonOj.getString("chinese_name"))).append("】");
-        resultMap.put("content", information.toString());
-        resultMap.put("bean", beanName);
-        resultMap.put("employee_id", employeeId);
-        resultMap.put("company_id", companyId);
-        commonAppService.savaOperationRecord(resultMap);
-        
-        // 助手推送
-        StringBuilder parameters = new StringBuilder();
-        parameters.append("{'company_id':'");
-        parameters.append(companyId);
-        parameters.append("','push_type':'1','id':'");
-        parameters.append(dataId);
-        parameters.append("','bean_name':'");
-        parameters.append(beanName);
-        parameters.append("','module_id':'");
-        parameters.append(jsonOj.getString("id"));
-        parameters.append("'}");
-        rabbitMQServer.sendMessage(Constant.PUSH_THREAD_QUEUE_NAME, parameters.toString());
-        
-        if (null != processJson)
-        {
-            String processName = processJson.getString("process_name");
-            // 流程参数
-            Map<String, Object> processVars = new HashMap<>();
-            processVars.put(ActivitiUtil.VAR_DISTINCTTYPE, processJson.getInteger("approver_duplicate"));
-            processVars.put(ActivitiUtil.VAR_DATA_ID, dataId);
-            if (!StringUtil.isEmpty(nextApproverBy))
+            // 处理审批数据
+            String nextApproverBy = reqJson.getJSONObject("data").getString("personnel_approverBy");
+            reqJson.getJSONObject("data").remove("personnel_ccTo");// 先保留一段时间，等前端取消传参时再删除此行代码
+            reqJson.getJSONObject("data").remove("personnel_approverBy");
+            // 字段模块绑定map
+            Map<String, String> fieldBeanMap = new HashMap<String, String>();
+            // 附件、图片
+            JSONObject handleResult = this.removeAttImgObj(reqJson, fieldBeanMap);
+            JSONObject saveJson = handleResult.getJSONObject("saveJSON");
+            JSONArray attImgArr = handleResult.getJSONArray("attImgArr");
+            
+            RequestBean requestBean = new RequestBean();
+            String beanName = reqJson.getString("bean");
+            String dataJsonStr = saveJson.getJSONObject("data").toString();
+            requestBean.setBean(beanName);
+            requestBean.setData(dataJsonStr);
+            
+            // 校验请求参数
+            if (StringUtil.isEmpty(beanName))
             {
-                processVars.put("nextAssignee", nextApproverBy);
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), "param[requestBean.getBean]is null");
+                return serviceResult;
             }
             
-            // 启用流程
-            Map<String, String> startMap = ActivitiUtil.startProcess(companyId,
-                processJson.getString("process_key"),
-                employeeId,
-                processVars,
-                // System.getProperty("user.dir").concat("/bpmnFiels11/"),
-                "已提交",
-                "提交审批",
-                -1);
-            String processInstanceId = startMap.get("processInstanceId");// 流程属性表中不需要维护实例id，因为同一个模块，每一条数据保存时都会产生一个新的实例id
-            String firstTaskId = startMap.get("firstTaskId");
-            List<Task> tasks = ActivitiUtil.getTasks(companyId, processInstanceId);
-            
-            if (null == processInstanceId)
+            if (StringUtil.isEmpty(dataJsonStr))
             {
-                throw new Exception("startProcessFail");
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), "param[requestBean.getData]is null");
+                return serviceResult;
             }
             
-            if (null == tasks || tasks.size() == 0)
+            // 解析token
+            InfoVo info = TokenMgr.obtainInfo(token);
+            Long companyId = info.getCompanyId();
+            Long employeeId = info.getEmployeeId();
+            
+            // 验证权限
+            serviceResult = moduleDataAuthAppService.checkOperateAuth(token, beanName, Constant.AUTH_ADD);
+            if (!serviceResult.isSucces())
             {
-                throw new Exception("notFindApprover");
+                return serviceResult;
             }
             
-            JSONObject empJson = employeeAppService.queryEmployee(employeeId, companyId);
-            StringBuilder setKey = new StringBuilder();
-            setKey.append(companyId);
-            setKey.append("_");
-            setKey.append(processInstanceId);
-            setKey.append("_");
-            setKey.append(RedisKey4Function.PROCESS_BEGIN_USER.getIndex());
-            JedisClusterHelper.set(setKey.toString(), empJson);
+            // 获取模块ID
+            StringBuilder queryModuleId = new StringBuilder();
+            queryModuleId.append("select id, chinese_name from ")
+                .append(DAOUtil.getTableName("application_module", companyId))
+                .append(" where english_name='")
+                .append(beanName)
+                .append("'");
+            JSONObject jsonOj = DAOUtil.executeQuery4FirstJSON(queryModuleId.toString());
             
-            setKey = new StringBuilder();
-            setKey.append(companyId);
-            setKey.append("_");
-            setKey.append(processInstanceId);
-            setKey.append("_");
-            setKey.append(RedisKey4Function.PROCESS_NAME.getIndex());
-            JedisClusterHelper.set(setKey.toString(), processName);
+            // 获取流程属性
+            JSONObject processJson = workflowAppService.getProcessAttributeByBeanForCreate(beanName, token);
             
-            // 将启用流程时缓存的节点字段版本取出，作为新增数据的字段权限版本。
-            StringBuilder key = new StringBuilder();
-            key.append(companyId);
-            key.append("_");
-            key.append(beanName);
-            key.append("_");
-            key.append(processJson.getString("id"));
-            key.append("_");
-            key.append(RedisKey4Function.PROCESS_MODULE_FIELD_V.getIndex());
-            Object fieldVersion = JedisClusterHelper.get(key.toString());
-            if (fieldVersion == null)
+            // 获取新增数据id
+            long dataId = BusinessDAOUtil.getNextval4Table(beanName, companyId.toString());
+            
+            JSONObject customerLayout = LayoutUtil.getEnableFields(companyId.toString(), requestBean.getBean(), null);
+            
+            // 构造保存json
+            requestBean.setId(dataId);
+            JSONObject saveDataJson = JSONObject.parseObject(requestBean.getData());
+            JSONObject subformDataJson = new JSONObject();
+            subformDataJson.put("bean", requestBean.getBean());
+            subformDataJson.put("data", saveDataJson);
+            // 保存子表单数据
+            boolean subformResult = saveSubformData(customerLayout, subformDataJson, companyId.toString(), dataId, null == processJson ? false : true);
+            if (!subformResult)
             {
-                JSONObject processFieldV = workflowAppService.getFieldV(companyId.toString(), processJson.getString("id"));
-                if (null != processJson.getString("id"))
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
+            // 封装主干数据
+            buildingSaveData(customerLayout, saveDataJson, requestBean.getBean(), companyId, employeeId, dataId);
+            String reck = rechecking(customerLayout, saveDataJson, companyId, beanName, clientFlag);
+            if (!StringUtils.isEmpty(reck))
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), reck.concat("存在重复的数据,请检查。"));
+                return serviceResult;
+            }
+            
+            if (null != processJson)
+            {
+                // 删除状态
+                saveDataJson.put(Constant.FIELD_DEL_STATUS, "0");
+                // 公海池id
+                saveDataJson.put(Constant.FIELD_SEAPOOL_ID, "0");
+                // 流程数据bean
+                saveDataJson.put("bean", beanName.concat("_approval"));
+            }
+            else
+            {
+                saveDataJson.put("bean", beanName);
+            }
+            if (saveDataJson.containsKey("data"))
+            {
+                saveDataJson.remove("data");
+            }
+            
+            JSONObject dataJson = new JSONObject();
+            dataJson.put("bean", saveDataJson.get("bean"));
+            if (saveDataJson.containsKey("bean"))
+            {
+                saveDataJson.remove("bean");
+            }
+            dataJson.put("data", saveDataJson.toJSONString());
+            // 获取插入数据sql
+            String insertSql = JSONParser4SQL.getInsertSql(dataJson, companyId.toString());
+            
+            // 保存业务数据
+            int count = DAOUtil.executeUpdate(insertSql);
+            if (count < 1)
+            {
+                serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                return serviceResult;
+            }
+            // 执行被引用字段相关的高级公式（当前数据保存到数据库后调用）
+            CustomUtil.executeSeniorformula(beanName, companyId.toString(), saveDataJson);
+            // 保存附件、图片
+            if (null != attImgArr)
+            {
+                saveAttachmentData(attImgArr, companyId.toString(), dataId, token, 1, fieldBeanMap, null == processJson ? false : true);
+            }
+            
+            // 添加动态
+            JSONObject resultMap = new JSONObject();
+            resultMap.put("relation_id", dataId);
+            resultMap.put("datetime_time", System.currentTimeMillis());
+            StringBuilder information = new StringBuilder();
+            information.append(" 新建了 【".concat(jsonOj.getString("chinese_name"))).append("】");
+            resultMap.put("content", information.toString());
+            resultMap.put("bean", beanName);
+            resultMap.put("employee_id", employeeId);
+            resultMap.put("company_id", companyId);
+            commonAppService.savaOperationRecord(resultMap);
+            
+            // 助手推送
+            StringBuilder parameters = new StringBuilder();
+            parameters.append("{'company_id':'");
+            parameters.append(companyId);
+            parameters.append("','push_type':'1','id':'");
+            parameters.append(dataId);
+            parameters.append("','bean_name':'");
+            parameters.append(beanName);
+            parameters.append("','module_id':'");
+            parameters.append(jsonOj.getString("id"));
+            parameters.append("'}");
+            rabbitMQServer.sendMessage(Constant.PUSH_THREAD_QUEUE_NAME, parameters.toString());
+            
+            if (null != processJson)
+            {
+                String errorInfo = processHandle(processJson, token, dataId, beanName, nextApproverBy);
+                if (!StringUtil.isEmpty(errorInfo))
                 {
-                    fieldVersion = processFieldV.getJSONObject("fieldVersion").getLong("$numberLong");
-                }
-                else
-                {
-                    log.error(processJson.getString("id").concat("流程，为获取到字段版本"));
+                    serviceResult.setCodeMsg(resultCode.get("common.fail"), errorInfo);
+                    throw new HjHqSystemException(1000, errorInfo);
                 }
             }
-            // 构造推送消息
-            JSONObject msgs = new JSONObject();
-            msgs.put("push_content", new StringBuilder("审批：").append(empJson.getString("employee_name")).append("的").append(processName).append("。"));
-            msgs.put("bean_name", beanName);
-            msgs.put("bean_name_chinese", "审批");
-            JSONArray approvalOper = new JSONArray();
-            JSONObject approvalOperJson = new JSONObject();
-            approvalOperJson.put("field_label", "");
-            approvalOperJson.put("field_value", "");
-            approvalOper.add(approvalOperJson);
-            msgs.put("field_info", approvalOper);
-            JSONObject paramFieldsJSON = new JSONObject();
-            paramFieldsJSON.put("dataId", dataId);
-            paramFieldsJSON.put("fromType", "1");// 0我发起的、1待我审批、2我已审批、3抄送到我
-            paramFieldsJSON.put("moduleBean", beanName);
-            msgs.put("param_fields", paramFieldsJSON);
+            else
+            {
+                JSONArray idArray = new JSONArray();
+                JSONObject id = new JSONObject();
+                id.put("id", dataId);
+                idArray.add(id);
+                JSONObject obj = new JSONObject();
+                obj.put("token", token);
+                obj.put("bean", beanName);
+                obj.put("trigger", 0);
+                obj.put("id", idArray);
+                rabbitMQServer.sendMessage("allot", obj.toString());
+            }
+            // 返回给前端数据ID
+            JSONObject jsonObj = new JSONObject();
+            jsonObj.put("dataId", dataId);
+            jsonObj.put("bean", beanName);
+            jsonObj.put("moduleName", jsonOj.getString("chinese_name"));
+            jsonObj.put("moduleId", jsonOj.getString("id"));
+            serviceResult.setCodeMsg(resultCode.get("common.sucess"), jsonObj.toString());
             
-            // 保存操作记录
-            JSONObject saveObj = new JSONObject();
-            JSONObject paramsObj = new JSONObject();
-            saveObj.put("process_definition_id", processInstanceId);
-            saveObj.put("task_id", firstTaskId);
-            saveObj.put("task_key", Constant.PROCESS_FIELD_FIRST_TASK);
-            saveObj.put("task_name", "开始任务");
-            saveObj.put("task_status_id", Constant.PROCESS_STATUS_COMMIT);
-            saveObj.put("task_status_name", "已提交");
-            saveObj.put("approval_employee_id", employeeId.toString());
-            saveObj.put("approval_message", "提交审批");
-            paramsObj.put("token", token);
-            paramsObj.put("type", Constant.PROCESS_STATUS_COMMIT);
-            paramsObj.put("dataId", dataId);
-            paramsObj.put("moduleBean", beanName);
-            paramsObj.put("firstTaskId", firstTaskId);
-            paramsObj.put("pushMsg", msgs);
-            workflowAppService.saveApprovedTask(saveObj, paramsObj);
-            
-            // 保存审批申请
-            saveObj = new JSONObject();
-            saveObj.put("process_key", processJson.getString("process_key"));
-            saveObj.put("process_name", processName);
-            saveObj.put("process_definition_id", processInstanceId);
-            saveObj.put("process_status", Constant.PROCESS_STATUS_WAIT_APPROVAL);
-            saveObj.put("process_v", processJson.getLong("id"));
-            saveObj.put("process_field_v", (Long)fieldVersion);
-            saveObj.put("task_id", firstTaskId);
-            saveObj.put("module_bean", processJson.getString("module_bean"));
-            saveObj.put("approval_data_id", dataId);
-            saveObj.put("begin_user_id", employeeId);
-            saveObj.put("begin_user_name", empJson.getString("employee_name"));
-            saveObj.put(Constant.FIELD_DEL_STATUS, 0);
-            saveObj.put("create_time", System.currentTimeMillis());
-            workflowAppService.saveProcessApproval(saveObj, token);
+            log.debug("end !");
+            return serviceResult;
         }
-        else
+        catch (Exception e)
         {
-            JSONArray idArray = new JSONArray();
-            JSONObject id = new JSONObject();
-            id.put("id", dataId);
-            idArray.add(id);
-            JSONObject obj = new JSONObject();
-            obj.put("token", token);
-            obj.put("bean", beanName);
-            obj.put("trigger", 0);
-            obj.put("id", idArray);
-            rabbitMQServer.sendMessage("allot", obj.toString());
-            JobManager.getInstance().submitJob(new FirstThread());
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return serviceResult;
         }
-        // 返回给前端数据ID
-        JSONObject jsonObj = new JSONObject();
-        jsonObj.put("dataId", dataId);
-        jsonObj.put("bean", beanName);
-        jsonObj.put("moduleName", jsonOj.getString("chinese_name"));
-        jsonObj.put("moduleId", jsonOj.getString("id"));
-        serviceResult.setCodeMsg(resultCode.get("common.sucess"), jsonObj.toString());
-        
-        log.debug("end !");
-        return serviceResult;
     }
     
     /**
@@ -664,10 +555,12 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             Long approverBy = reqJson.getJSONObject("data").getLong("personnel_approverBy");
             reqJson.getJSONObject("data").remove("personnel_ccTo");
             reqJson.getJSONObject("data").remove("personnel_approverBy");
+            // 字段模块绑定map
+            Map<String, String> fieldBeanMap = new HashMap<String, String>();
             // 附件、图片
-            JSONObject handleResult = this.removeAttImgObj(reqJson);
+            JSONObject handleResult = this.removeAttImgObj(reqJson, fieldBeanMap);
             JSONObject updateJson = handleResult.getJSONObject("saveJSON");
-            JSONObject attImgJson = handleResult.getJSONObject("attImgJSON");
+            JSONArray attImgArray = handleResult.getJSONArray("attImgJSON");
             RequestBean requestBean = new RequestBean();
             String dataId = reqJson.getString("id");
             String beanName = reqJson.getString("bean");
@@ -765,6 +658,18 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             json.put("bean", beanName);
             json.put("data", dataJsonStr);
             
+            // 获取流程属性
+            boolean approvalFlag = false;
+            JSONObject processJson = workflowAppService.getProcessAttributeByBeanForUpdate(dataId, beanName, token);
+            JSONObject businessApproval = null;
+            if (null != processJson)
+            {
+                businessApproval = workflowAppService.getBusinessApprovalByBeanAndId(companyId, beanName, Integer.parseInt((dataId)));
+                if (null == businessApproval)
+                {// 审批完成的数据，再修改时，修改业务数据表
+                    approvalFlag = true;
+                }
+            }
             if (tablesJson != null && !StringUtils.isEmpty(tablesJson.get("tables")))
             {
                 // 模块所有子表单
@@ -776,26 +681,17 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                     for (Object tmpTable : tablesArr)
                     {
                         String subformTableName = tmpTable.toString();
+                        if (approvalFlag)
+                        {
+                            subformTableName = subformTableName.substring(0, subformTableName.lastIndexOf("_")).concat("_approval_").concat(companyId.toString());
+                        }
                         delSql.append("delete from ").append(subformTableName).append(" where ").append(refId).append(" = ").append(dataId).append(";");
                     }
                     
                     // 删除关联的子表单信息
                     JSONObject reqJSON = new JSONObject();
                     reqJSON.put("updateSql", delSql);
-                    CustomAsyncHandle approvalHandle = new CustomAsyncHandle(null, reqJSON);
-                    approvalHandle.executeUpdate();
-                }
-            }
-            // 获取流程属性
-            boolean approvalFlag = false;
-            JSONObject processJson = workflowAppService.getProcessAttributeByBean(beanName, token);
-            JSONObject businessApproval = null;
-            if (null != processJson)
-            {
-                businessApproval = workflowAppService.getBusinessApprovalByBeanAndId(companyId, beanName, Integer.parseInt((dataId)));
-                if (null == businessApproval)
-                {// 审批完成的数据，再修改时，修改业务数据表
-                    approvalFlag = true;
+                    DAOUtil.execute(delSql.toString());
                 }
             }
             // 获取布局
@@ -847,7 +743,10 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             CustomUtil.executeSeniorformula(beanName, companyId.toString(), saveDataJson);
             
             // 保存附件、图片
-            boolean attachmentResult = saveAttachmentData(attImgJson.toString(), companyId.toString(), Long.valueOf(dataId), token);
+            if (null != attImgArray)
+            {
+                saveAttachmentData(attImgArray, companyId.toString(), Long.valueOf(dataId), token, 2, fieldBeanMap, null == processJson ? false : true);
+            }
             
             // 添加动态
             JSONObject resultMap = new JSONObject();
@@ -934,7 +833,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 approvalOper.add(approvalOperJson);
                 msgs.put("field_info", approvalOper);
                 JSONObject paramFieldsJSON = new JSONObject();
-                paramFieldsJSON.put("dataId", dataId);
+                paramFieldsJSON.put("dataId", Long.parseLong(dataId));
                 paramFieldsJSON.put("fromType", "1");// 0我发起的、1待我审批、2我已审批、3抄送到我
                 paramFieldsJSON.put("moduleBean", beanName);
                 msgs.put("param_fields", paramFieldsJSON);
@@ -977,7 +876,6 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 obj.put("trigger", 1);
                 obj.put("id", idArray);
                 rabbitMQServer.sendMessage("allot", obj.toString());
-                JobManager.getInstance().submitJob(new FirstThread());
             }
         }
         catch (Exception e)
@@ -1074,19 +972,26 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     public JSONObject findDataRelation(String token, String beanName, String clientFlag, Integer id)
     {
         log.debug(String.format(" findDataRelation parameters{args0:%s,args1:%s} start!", beanName, id.toString()));
+        List<JSONObject> resultModules = new ArrayList<>();
         JSONObject result = new JSONObject();
         // 终端类型
         clientFlag = clientFlag.equals("0") ? "0" : "1";
         // 解析token
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
+        List<String> modules = findAllModuleListByAuth(token, clientFlag, companyId);
         // 查询关联模块
         List<JSONObject> refModules = LayoutUtil.getRelationsByReferenceBean(companyId.toString(), beanName, null);
         for (JSONObject obj : refModules)
         {
+            String moduleName = obj.getString("moduleName");
+            // 过滤非当前用户可以查看的模块
+            if (!modules.contains(moduleName))
+                continue;
+            resultModules.add(obj);
             Map<String, String> reqParam = new HashMap<>();
             reqParam.put("token", token);
-            reqParam.put("beanName", obj.getString("moduleName"));
+            reqParam.put("beanName", moduleName);
             reqParam.put("menuId", null);
             JSONObject req = new JSONObject();
             req.put(obj.getString("fieldName"), id);
@@ -1109,12 +1014,57 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             data = getFirst(companyId, beanName, clientFlag, token, 0, id);
         }
         result.put("operationInfo", data);
-        result.put("refModules", refModules);
+        result.put("refModules", resultModules);
         result.put("isOpenProcess", isOpenProcess(beanName, companyId));
         result.put("isEmailModule", isEmailModule(beanName, companyId));
         log.debug("end !");
         return result;
         
+    }
+    
+    /**
+     * 
+     * @param token
+     * @param clientFlag
+     * @param companyId
+     * @return
+     * @Description:获取当前登陆用户能查看的权限模块
+     */
+    private List<String> findAllModuleListByAuth(String token, String clientFlag, Long companyId)
+    {
+        List<String> modules = new ArrayList<>();
+        JSONObject roleJson = moduleDataAuthAppService.getRoleByUser(token);
+        if (roleJson == null || roleJson.get("id") == null)
+        {
+            return modules;
+        }
+        // 角色id.
+        Integer roleId = roleJson.getInteger("id");
+        String roleModuleTable = DAOUtil.getTableName("role_module", companyId);
+        String moduleTable = DAOUtil.getTableName("application_module", companyId);
+        // 组装sql
+        StringBuilder querySql = new StringBuilder();
+        querySql.append("select t2.id as moduleId, t2.chinese_name as name, t2.english_name as bean, t1.data_auth from ");
+        querySql.append(roleModuleTable);
+        querySql.append(" t1, ");
+        querySql.append(moduleTable);
+        querySql.append(" t2 where t1.module_id = t2.id and t1.role_id = ");
+        querySql.append(roleId);
+        querySql.append(" and t2.").append(Constant.FIELD_DEL_STATUS).append("=0 ");
+        if (!"0".equals(clientFlag))
+        {
+            querySql.append(" and ( t2.terminal_app=1 or t2.terminal_app=3 ) ");
+        }
+        else
+        {
+            querySql.append(" and ( t2.terminal_app=2 or t2.terminal_app=3 )");
+        }
+        List<JSONObject> resultList = DAOUtil.executeQuery4JSON(querySql.toString());
+        for (JSONObject result : resultList)
+        {
+            modules.add(result.getString("bean"));
+        }
+        return modules;
     }
     
     @Override
@@ -1136,7 +1086,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     }
     
     @Override
-    public List<JSONObject> findDataRelationsForPc(String token, String bean, String clientFlag)
+    public List<JSONObject> findDataRelationsForPc(String token, String bean, String clientFlag, String flag)
     {
         
         log.debug(String.format(" findDataRelationsForPc parameters{args0:%s,args1:%s} start!", bean, clientFlag));
@@ -1146,7 +1096,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         // 查询关联模块
-        return LayoutUtil.getRelationsByCurrentBeanForPc(companyId.toString(), bean, clientFlag, "", 0);
+        return LayoutUtil.getRelationsByCurrentBeanForPc(companyId.toString(), bean, clientFlag, "", 0, flag);
         
     }
     
@@ -1339,7 +1289,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             Map<String, Object> resultMap = new HashMap<String, Object>();
             resultMap.put("relation_id", id);
             resultMap.put("datetime_time", System.currentTimeMillis());
-            resultMap.put("content", "被删除了");
+            resultMap.put("content", "删除了");
             resultMap.put("bean", beanName);
             resultMap.put("employee_id", employeeId);
             resultMap.put("company_id", companyId);
@@ -1552,10 +1502,20 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             }
             else if (Constant.DATA_AUTH_DEPARTMENT.equals(data_auth))
             {
-                String departmentCenterTable = DAOUtil.getTableName("department_center", companyId);
-                menuSql.append(" and t_main.personnel_principal in (select employee_id from ").append(departmentCenterTable);
-                menuSql.append(" where status = '0' and is_main = '1' and department_id in (select department_id from ").append(departmentCenterTable);
-                menuSql.append(" where status = '0' and employee_id=").append(employeeId).append("))");
+                StringBuilder employeesString = new StringBuilder();
+                List<JSONObject> employeeIds = employeeAppService.queryDepartmentAuthEmployee(companyId.toString(), employeeId.toString());
+                for (JSONObject object : employeeIds)
+                {
+                    if (employeesString.length() > 0)
+                    {
+                        employeesString.append(",");
+                    }
+                    employeesString.append("'").append(object.getString("employee_id")).append("'");
+                }
+                if (employeesString.length() > 0)
+                {
+                    menuSql.append(" and t_main.personnel_principal in (").append(employeesString).append(")");
+                }
             }
             
         }
@@ -1836,7 +1796,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         String source = "";
         String tips = "";// 原模块和目标模块的信息
         boolean delete = false;
-        if (list != null && list.size() > 0)
+        if (!list.isEmpty())
         {
             JSONObject sourceObject = list.get(0);
             Iterator idIte = idsArray.iterator();
@@ -1874,7 +1834,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                         String field = (String)ite2.next();
                         if (!targetFieldSet.contains(field))
                         {
-                            // TODO 自动编号
+                            // 自动编号
                             String value = getIdentifierValue(target, field, targetBeanJson, modelId, companyId);
                             targetBean.put(field, value);
                         }
@@ -1901,13 +1861,17 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                     long newDataId = BusinessDAOUtil.getNextval4Table(basic.getString("target_bean"), companyId.toString());
                     targetBean.put("id", newDataId);
                     targetBean.put(Constant.FIELD_DEL_STATUS, 0);
+                    // 高级公式 、函数、简单公式 的调用
+                    JSONObject customerLayout = LayoutUtil.getEnableFields(companyId.toString(), basic.getString("target_bean"), null);
+                    calFormula(customerLayout, targetBean, companyId, basic.getString("target_bean"), newDataId, 0);
                     JSONObject json = new JSONObject();
                     json.put("data", targetBean.toString());
                     json.put("bean", basic.getString("target_bean"));
                     DAOUtil.executeUpdate(JSONParser4SQL.getInsertSql(json, companyId.toString()));
-                    // TODO 子菜单
+                    
+                    // 子菜单
                     JSONArray subFormArray = obj.getJSONArray("subformrelation");
-                    if (subFormArray != null && subFormArray.size() > 0)
+                    if (!subFormArray.isEmpty())
                     {
                         for (Iterator ite = subFormArray.iterator(); ite.hasNext();)
                         {
@@ -1918,7 +1882,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                             table = DAOUtil.getTableName(new StringBuilder(source).append("_").append(name).toString(), companyId);
                             builder.append("select * from ").append(table).append(" where ").append(refId).append(" = ").append(sourceObject.get("id"));
                             List<JSONObject> subList = DAOUtil.executeQuery4JSON(builder.toString());
-                            if (subList != null && subList.size() > 0)
+                            if (!subList.isEmpty())
                             {
                                 JSONObject subObject = subList.get(0);
                                 // 查询模块子表单数据
@@ -2305,13 +2269,6 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     @Override
     public ServiceResult<String> print(Map map)
     {
-        // 验证权限
-        /*
-         * ServiceResult<String> serviceResult =
-         * moduleDataAuthAppService.checkOperateAuth(token, beanName,
-         * Constant.AUTH_CONVERSION); if (!serviceResult.isSucces()) { return
-         * serviceResult; }
-         */
         return null;
         
     }
@@ -2339,76 +2296,117 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         return result;
     }
     
-    private boolean saveAttachmentData(String saveJsonStr, String companyId, Long relationId, String token)
+    private boolean saveAttachmentData(JSONArray attImgArr, String companyId, Long relationId, String token, int flag, Map<String, String> fieldBeanMap, boolean approvalFlag)
     {
-        List<String> attachmentKeys = new ArrayList<String>();
-        JSONObject saveJson = JSONObject.parseObject(saveJsonStr);
-        LinkedHashMap<String, String> jsonMap = JSON.parseObject(saveJsonStr, new TypeReference<LinkedHashMap<String, String>>()
+        Set<String> attachmentKeys = new HashSet<String>();
+        log.debug(String.format(" 附件 新增/编辑 saveAttachmentData parameters{args0:%s} start!", attImgArr));
+        for (Object attImgObj : attImgArr)
         {
-        });
-        for (Map.Entry<String, String> entry : jsonMap.entrySet())
-        {
-            String key = entry.getKey();
-            if (key.contains("picture") || key.contains("attachment"))
+            String saveJsonStr = JSONObject.toJSONString((JSONObject)attImgObj);
+            JSONObject saveJson = JSONObject.parseObject(saveJsonStr);
+            LinkedHashMap<String, String> jsonMap = JSON.parseObject(saveJsonStr, new TypeReference<LinkedHashMap<String, String>>()
             {
-                if (!StringUtil.isEmpty(saveJson.get(key)))
-                {
-                    attachmentKeys.add(key);
-                }
+            });
+            String attachment = "attachment";
+            if (approvalFlag)
+            {
+                attachment = attachment.concat("_approval");
             }
-        }
-        
-        if (!attachmentKeys.isEmpty())
-        {
-            List<Object[]> batchValues = new ArrayList<>();
-            List<JSONObject> attachments = new ArrayList<JSONObject>();
-            for (String key : attachmentKeys)
+            String attachmentTable = DAOUtil.getTableName(attachment, companyId);
+            StringBuilder batchDeleteSql = new StringBuilder();
+            for (Map.Entry<String, String> entry : jsonMap.entrySet())
             {
-                JSONArray attachmentArr = saveJson.getJSONArray(key);
-                if (attachmentArr.size() > 0)
+                String key = entry.getKey();
+                if (key.contains("picture") || key.contains("attachment"))
                 {
-                    for (Object attachmentObj : attachmentArr)
+                    String value = saveJson.getString(key);
+                    if (!StringUtil.isEmpty(value) && !value.equals("[]"))
                     {
-                        JSONObject attachmentJson = (JSONObject)attachmentObj;
-                        List<Object> attachmentValues = new ArrayList<Object>();
-                        attachmentValues.add(relationId);
-                        attachmentValues.add(attachmentJson.getString("file_name"));
-                        attachmentValues.add(attachmentJson.getString("file_type"));
-                        attachmentValues.add(attachmentJson.getLong("file_size"));
-                        attachmentValues.add(attachmentJson.getString("file_url"));
-                        attachmentValues.add(key);
-                        attachmentValues.add(attachmentJson.getInteger("serial_number"));
-                        attachmentValues.add(attachmentJson.getString("upload_by"));
-                        attachmentValues.add(attachmentJson.getLong("upload_time"));
-                        batchValues.add(attachmentValues.toArray());
-                        JSONObject pobj = new JSONObject();
-                        pobj.put("id", relationId);
-                        pobj.put("url", attachmentJson.getString("file_url"));
-                        attachments.add(pobj);
+                        attachmentKeys.add(key);
+                    }
+                    else
+                    {
+                        if (flag == 2)// 编辑
+                        {
+                            
+                            batchDeleteSql.append(" delete from ")
+                                .append(attachmentTable)
+                                .append(" where data_id=")
+                                .append(relationId)
+                                .append(" and original_file_name='")
+                                .append(key)
+                                .append("' and bean='")
+                                .append(fieldBeanMap.get(key))
+                                .append("'; ");
+                        }
                     }
                 }
             }
-            // 先删除后增加
-            String attachmentTable = DAOUtil.getTableName("attachment", companyId);
-            StringBuilder batchInsertSql = new StringBuilder();
-            batchInsertSql.append(" delete from ").append(attachmentTable).append(" where data_id=").append(relationId);
-            DAOUtil.executeUpdate(batchInsertSql.toString());
-            batchInsertSql.setLength(0);
-            batchInsertSql.append("insert into ");
-            batchInsertSql.append(attachmentTable);
-            batchInsertSql
-                .append("(data_id, file_name, file_type, file_size, file_url, original_file_name, serial_number, upload_by, upload_time) values(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            if (batchDeleteSql.length() > 0)
+            {
+                
+                // 对现在更新的附件图片删除
+                log.debug(String.format(" 附件 删除 saveAttachmentData parameters{args0:%s} start!", batchDeleteSql.toString()));
+                DAOUtil.executeUpdate(batchDeleteSql.toString());
+            }
             
-            DAOUtil.executeBatchUpdate(batchInsertSql.toString(), batchValues);
-            fileLibraryAppService.editModuleDataId(token, attachments);
-        }
-        else
-        {
-            // 删除图片
-            String attachmentTable = DAOUtil.getTableName("attachment", companyId);
-            StringBuilder batchInsertSql = new StringBuilder();
-            batchInsertSql.append(" delete from ").append(attachmentTable).append(" where data_id=").append(relationId);
-            DAOUtil.executeUpdate(batchInsertSql.toString());
+            if (!attachmentKeys.isEmpty())
+            {
+                List<JSONObject> attachments = new ArrayList<JSONObject>();
+                StringBuilder batchInsertSql = new StringBuilder();
+                for (String key : attachmentKeys)
+                {
+                    JSONArray attachmentArr = saveJson.getJSONArray(key);
+                    if (attachmentArr != null && attachmentArr.size() > 0)
+                    {
+                        List<Object[]> batchValues = new ArrayList<>();
+                        for (Object attachmentObj : attachmentArr)
+                        {
+                            JSONObject attachmentJson = (JSONObject)attachmentObj;
+                            List<Object> attachmentValues = new ArrayList<Object>();
+                            attachmentValues.add(relationId);
+                            attachmentValues.add(attachmentJson.getString("file_name"));
+                            attachmentValues.add(attachmentJson.getString("file_type"));
+                            attachmentValues.add(attachmentJson.getLong("file_size"));
+                            attachmentValues.add(attachmentJson.getString("file_url"));
+                            attachmentValues.add(key);
+                            attachmentValues.add(attachmentJson.getInteger("serial_number"));
+                            attachmentValues.add(attachmentJson.getString("upload_by"));
+                            attachmentValues.add(attachmentJson.getLong("upload_time"));
+                            attachmentValues.add(fieldBeanMap.get(key));
+                            attachmentValues.add(attachmentJson.getInteger("idx"));
+                            batchValues.add(attachmentValues.toArray());
+                            JSONObject pobj = new JSONObject();
+                            pobj.put("id", relationId);
+                            pobj.put("url", attachmentJson.getString("file_url"));
+                            attachments.add(pobj);
+                        }
+                        // 则先删除原来的后增加
+                        if (flag == 2)
+                        {
+                            batchInsertSql.setLength(0);
+                            batchInsertSql.append(" delete from ")
+                                .append(attachmentTable)
+                                .append(" where data_id=")
+                                .append(relationId)
+                                .append(" and original_file_name='")
+                                .append(key)
+                                .append("' and bean='")
+                                .append(fieldBeanMap.get(key))
+                                .append("'");
+                            DAOUtil.executeUpdate(batchInsertSql.toString());
+                        }
+                        batchInsertSql.setLength(0);
+                        batchInsertSql.append("insert into ");
+                        batchInsertSql.append(attachmentTable);
+                        batchInsertSql.append(
+                            "(data_id, file_name, file_type, file_size, file_url, original_file_name, serial_number, upload_by, upload_time, bean, idx) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        DAOUtil.executeBatchUpdate(batchInsertSql.toString(), batchValues);
+                        log.debug(String.format(" 附件 新增 saveAttachmentData parameters{args0:%s, args1:%s} start!", batchInsertSql.toString(), batchValues));
+                        fileLibraryAppService.editModuleDataId(token, attachments);
+                    }
+                }
+            }
         }
         return true;
     }
@@ -2427,7 +2425,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     {
         // 高级函数公式赋值 、 自动编号赋值
         dataJson.put("id", dataId);
-        calFormula(customerLayout, dataJson, companyId, bean, dataId);
+        calFormula(customerLayout, dataJson, companyId, bean, dataId, 0);
         dataJson.put(Constant.FIELD_CREATE_BY, employeeId);
         dataJson.put(Constant.FIELD_CREATE_TIME, System.currentTimeMillis());
         dataJson.put(Constant.FIELD_MODIFY_BY, employeeId);
@@ -2449,7 +2447,6 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 }
             }
         }
-        
     }
     
     /**
@@ -2460,12 +2457,10 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
      * @param dataId
      * @Description:自动编号赋值、 高级公式 函数 简单公式赋值
      */
-    private void calFormula(JSONObject customerLayout, JSONObject dataObj, Long companyId, String bean, long dataId)
+    private void calFormula(JSONObject customerLayout, JSONObject dataObj, Long companyId, String bean, long dataId, int flag)
     {
-        
-        // 高级公式 、函数、简单公式 的调用
         try
-        {
+        { // 高级公式 、函数、简单公式 的调用
             CustomUtil.executeFormulaForNewData(customerLayout, dataObj, companyId.toString(), false);
         }
         catch (Exception e)
@@ -2488,9 +2483,8 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 String name = obj.getString("name");
                 if (type.equals(Constant.TYPE_IDENTIFIER))
                 {
-                    if (dataId != 0)
+                    if (dataId != 0 && flag == 0)
                     {
-                        
                         JSONObject numbering = obj.getJSONObject("numbering");
                         String fixedValue = numbering.getString("fixedValue");
                         String dateFormat = numbering.getString("dateValue");
@@ -2501,7 +2495,6 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 }
             }
         }
-        
     }
     
     /**
@@ -2690,7 +2683,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         JSONObject tmpJson = dataJson.getJSONObject("data");
         tmpJson.put("id", dataJson.getLongValue("id"));
         // 高级函数公式赋值 、 自动编号赋值
-        calFormula(customerLayout, tmpJson, companyId, dataJson.getString("bean"), dataJson.getLongValue("id"));
+        calFormula(customerLayout, tmpJson, companyId, dataJson.getString("bean"), dataJson.getLongValue("id"), 1);
         // 更新人
         tmpJson.put("personnel_modify_by", employeeId);
         // 更新时间
@@ -2709,22 +2702,60 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     @Override
     public List<JSONObject> findRelationDataList(JSONObject reqJson, String token, String clientFlag)
     {
-        
         log.debug(String.format(" findRelationDataList parameters{args0:%s} start!", reqJson.toString()));
-        Map<String, String> map = null;
         // 解析token
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
+        Long employeeId = info.getEmployeeId();
         // 查询条件
         Document queryDoc = new Document();
         queryDoc.put("companyId", companyId.toString());
         queryDoc.put("bean", reqJson.getString("bean"));
         List<String> queryFields = new ArrayList<>();
         List<String> resultFields = new ArrayList<>();
-        map = LayoutUtil.findModuleMappingLayout(queryDoc, Constant.MAPPING_COLLECTION, reqJson, queryFields);
+        Map<String, String> map = LayoutUtil.findModuleMappingLayout(queryDoc, Constant.MAPPING_COLLECTION, reqJson, queryFields);
+        // 关联依赖控制字段的关联关系如果没有值，那么依赖字段的关联关系就不展示
+        String searchField = reqJson.getString("searchField");
+        JSONObject formJson = reqJson.getJSONObject("form");
+        List<JSONObject> relyonList = LayoutUtil.findDocs(queryDoc, Constant.RELYON_COLLECTION);
+        Map<String, String> dataMap = new HashMap<>();
+        String controlStr = "";
+        if (!relyonList.isEmpty())
+        {
+            for (int i = 0; i < relyonList.size(); i++)
+            {
+                JSONObject jo = relyonList.get(i);
+                JSONObject conJo = (JSONObject)jo.get("controlField");
+                JSONObject relJo = (JSONObject)jo.get("relyonField");
+                String conName = conJo.getString("name");
+                String relName = relJo.getString("name");
+                dataMap.put(relName, conName);
+            }
+            String controlRef = dataMap.get(searchField);
+            if (null != controlRef)
+            {
+                controlStr = formJson.getString(controlRef);
+                if (controlStr.isEmpty())
+                {
+                    return new ArrayList<>();
+                }
+            }
+        }
+        
         List<JSONObject> resultList = new ArrayList<>();
         // 获取查询sql
         Map<String, String> sqlMap = JSONParser4SQL.getBeanRelationRelyonQuery(companyId.toString(), reqJson, queryFields, resultFields);
+        if (sqlMap != null && sqlMap.containsKey("sql"))
+        {
+            String sql = sqlMap.get("sql");
+            int orderBy = sql.lastIndexOf(" order by ");
+            String orderByStr = sql.substring(orderBy);
+            String menuSql = sql.substring(0, orderBy);
+            String authWhere = getAuthWhere(token, companyId, employeeId, sqlMap.get("tables"));
+            menuSql += authWhere;
+            menuSql += orderByStr;
+            sqlMap.put("sql", menuSql);
+        }
         // 获取表字段注释
         Map<String, String> commentMap = BusinessDAOUtil.getTableColumnComment(sqlMap.get("tables"), companyId.toString());
         // 封装数据列表
@@ -2770,9 +2801,8 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                     }
                 }
                 JSONObject newObj = new JSONObject();
-                if (newArr.size() > 0)
+                if (!newArr.isEmpty())
                 {
-                    
                     newObj.put("row", newArr);
                 }
                 else
@@ -2789,15 +2819,193 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     }
     
     /**
+     * 获取角色模块数据权限
+     * 
+     * @param companyId
+     * @param employeeId
+     * @param moduleId
+     * @return
+     * @Description:
+     */
+    private String getDataAuthByRoleModule(String companyId, String employeeId, Object moduleId)
+    {
+        // 获取角色模块数据权限
+        String roleTable = DAOUtil.getTableName("role", companyId);
+        String userTable = DAOUtil.getTableName("employee", companyId);
+        String roleModuleTable = DAOUtil.getTableName("role_module", companyId);
+        
+        StringBuilder selectRoleModule = new StringBuilder();
+        selectRoleModule.append(" select data_auth from ");
+        selectRoleModule.append(roleModuleTable).append(" rm join ");
+        selectRoleModule.append(roleTable).append(" r  on rm.role_id=r.id join ");
+        selectRoleModule.append(userTable).append(" u on u.role_id=r.id ");
+        selectRoleModule.append(" where u.id=").append(employeeId);
+        selectRoleModule.append(" and rm.module_id = ").append(moduleId);
+        return DAOUtil.executeQuery4Object(selectRoleModule.toString(), String.class);
+    }
+    
+    /**
+     * 
+     * @param token
+     * @param companyId
+     * @param employeeId
+     * @param bean
+     * @return
+     * @Description:获取当前登陆人对模块所拥有的数据权限控制
+     */
+    private String getAuthWhere(String token, Long companyId, Long employeeId, String bean)
+    {
+        JSONObject roleJson = moduleDataAuthAppService.getRoleByUser(token);
+        if (roleJson == null || roleJson.isEmpty())
+        {
+            return "";
+        }
+        // 权限控制
+        StringBuilder menuSql = new StringBuilder();
+        // 获取模块ID
+        StringBuilder queryModuleId = new StringBuilder();
+        queryModuleId.append("select id, chinese_name from ").append(DAOUtil.getTableName("application_module", companyId)).append(" where english_name='").append(bean).append(
+            "'");
+        JSONObject jsonOj = DAOUtil.executeQuery4FirstJSON(queryModuleId.toString());
+        if (jsonOj == null)
+        {
+            return "";
+        }
+        String data_auth = getDataAuthByRoleModule(companyId.toString(), employeeId.toString(), jsonOj.getString("id"));
+        if (data_auth != null)
+        {
+            if (Constant.DATA_AUTH_EMPLOYEE.equals(data_auth))
+            {
+                menuSql.append(" and t_main.personnel_principal = ").append(employeeId);
+            }
+            else if (Constant.DATA_AUTH_DEPARTMENT.equals(data_auth))
+            {
+                
+                StringBuilder employeesString = new StringBuilder();
+                List<JSONObject> employeeIds = employeeAppService.queryDepartmentAuthEmployee(companyId.toString(), employeeId.toString());
+                for (JSONObject object : employeeIds)
+                {
+                    if (employeesString.length() > 0)
+                    {
+                        employeesString.append(",");
+                    }
+                    employeesString.append("'").append(object.getString("employee_id")).append("'");
+                }
+                if (employeesString.length() > 0)
+                {
+                    menuSql.append(" and t_main.personnel_principal in (").append(employeesString).append(")");
+                }
+            }
+            else if (Constant.DATA_AUTH_COMPANY.equals(data_auth))
+            {
+                // 查看企业的不用管，就是查看所有
+            }
+        }
+        
+        Map<String, Object> emap = new HashMap<>();
+        emap.put("employee_id", employeeId);
+        emap.put("token", token);
+        String departmentIds = employeeAppService.getdepartmentIds(String.valueOf(employeeId), String.valueOf(companyId));
+        Integer roleId = roleJson.getInteger("id");
+        // 获取模块单条数据共享
+        Map<String, String> reqmap = new HashMap<>();
+        reqmap.put("companyId", companyId.toString());
+        reqmap.put("employeeId", employeeId.toString());
+        reqmap.put("bean", bean);
+        reqmap.put("departmentIds", departmentIds);
+        reqmap.put("roleId", roleId.toString());
+        String shareIds = getShareData(reqmap);
+        // 模块共享条件
+        StringBuilder module_share = new StringBuilder();
+        boolean shareButNotCondition = false;
+        // 获取模块共享设置
+        String shareTable = DAOUtil.getTableName("module_share_setting", companyId);
+        StringBuilder shareBuilder = new StringBuilder();
+        shareBuilder.append("select * from ").append(shareTable).append(" where ").append(Constant.FIELD_DEL_STATUS).append("=0 and bean_name='").append(bean).append("'");
+        String[] departIds = departmentIds.split(",");
+        Set<String> idSet = new HashSet<String>();
+        StringBuilder where = new StringBuilder();
+        for (String did : departIds)
+        {
+            if (!idSet.contains(did))
+            {
+                idSet.add(did);
+                if (where.length() > 0)
+                {
+                    where.append(" or ");
+                }
+                where.append(" position('").append("0-").append(did).append("' in ").append("allot_employee_v").append(" )>0");
+            }
+        }
+        where.append(" or position('").append("1-").append(employeeId).append("' in ").append("allot_employee_v").append(" )>0");
+        where.append(" or position('").append("2-").append(roleId).append("' in ").append("allot_employee_v").append(" )>0");
+        where.append(" or position('").append("4-").append(companyId).append("' in ").append("allot_employee_v").append(" )>0");
+        shareBuilder.append(" and ( ").append(where).append(" ) ");
+        List<JSONObject> shareList = DAOUtil.executeQuery4JSON(shareBuilder.toString());
+        if (!shareList.isEmpty())
+        {
+            for (JSONObject share : shareList)
+            {
+                String queryCondition = share.getString("query_condition");
+                if (!StringUtils.isEmpty(queryCondition))
+                {
+                    if (module_share.length() > 0)
+                    {
+                        module_share.append(" or ");
+                    }
+                    module_share.append(queryCondition.replace(Constant.VAR_QUOTES, "'"));
+                }
+                else
+                {
+                    shareButNotCondition = true;
+                }
+            }
+        }
+        
+        StringBuilder andBuilder = new StringBuilder();
+        if (module_share.length() > 0)
+        {
+            andBuilder.append(" or ").append(module_share);
+        }
+        if (!StringUtils.isEmpty(shareIds))
+        {
+            andBuilder.append(" or ").append(Constant.MAIN_TABLE_ALIAS).append(".id in (").append(shareIds).append(" ) ");
+        }
+        // 如果可以存在任何条件共享的，就不需要加权限限制了
+        if (shareButNotCondition)
+        {
+            menuSql.append(" and 1=1 ");
+        }
+        else
+        {
+            if (andBuilder.length() > 0)
+            {
+                menuSql.append(" and (1=1 ");
+                menuSql.append(andBuilder);
+                menuSql.append(" ) ");
+            }
+            
+        }
+        
+        return menuSql.toString();
+        
+    }
+    
+    /**
      * @param dataId
      * @param token
      * @return List
      * @Description:获取附件
      */
     @Override
-    public List<JSONObject> findAttachmentList(Integer dataId, Long companyId, String key)
+    public List<JSONObject> findAttachmentList(Integer dataId, Long companyId, String key, String bean, boolean approvalFlag, int idx)
     {
-        String attachmentTable = DAOUtil.getTableName("attachment", companyId);
+        String attachment = "attachment";
+        if (approvalFlag)
+        {
+            attachment = attachment.concat("_approval");
+        }
+        String attachmentTable = DAOUtil.getTableName(attachment, companyId);
         
         StringBuilder querySql = new StringBuilder();
         querySql.append("select * from ");
@@ -2805,7 +3013,13 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         querySql.append(" where data_id = ");
         querySql.append(dataId);
         querySql.append(" and original_file_name='");
-        querySql.append(key).append("'");
+        querySql.append(key);
+        querySql.append("' and bean='").append(bean).append("'");
+        if (idx > 0)
+        {
+            querySql.append(" and idx = ").append(idx);
+        }
+        querySql.append(" order by id asc ");
         return DAOUtil.executeQuery4JSON(querySql.toString());
     }
     
@@ -2883,7 +3097,7 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                     String key = entry.getKey();
                     if (key.contains("picture") || key.contains("attachment"))
                     {
-                        List<JSONObject> attachmentList = findAttachmentList(result.getInteger("id"), companyId, key);
+                        List<JSONObject> attachmentList = findAttachmentList(result.getInteger("id"), companyId, key, beanName, false, 0);
                         result.put(key, attachmentList);
                     }
                 }
@@ -2930,8 +3144,12 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                             sqlMap.put("sql", subquerySql);
                             List<LinkedHashMap<String, Object>> subformDataList = BusinessDAOUtil.getTableDataList(subCommentMap, sqlMap, fieldsList);
                             List<LinkedHashMap<String, Object>> subDataList = new ArrayList<>();
+                            LinkedHashMap<String, Object> newlink = null;
+                            int idx = 0;
                             for (LinkedHashMap<String, Object> link : subformDataList)
                             {
+                                idx++;
+                                newlink = new LinkedHashMap<String, Object>();
                                 if (link.containsKey("id"))
                                 {
                                     link.remove("id");
@@ -2944,9 +3162,22 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                                 {
                                     link.remove(refId);
                                 }
-                                subDataList.add(link);
+                                for (Map.Entry<String, Object> entry : link.entrySet())
+                                {
+                                    String subkey = entry.getKey();
+                                    if (subkey.contains("picture") || subkey.contains("attachment"))
+                                    {
+                                        List<JSONObject> attachmentList = findAttachmentList(dataId, companyId, subkey, subBeanName, false, idx);
+                                        newlink.put(subkey, attachmentList);
+                                    }
+                                    else
+                                    {
+                                        newlink.put(subkey, entry.getValue());
+                                    }
+                                }
+                                subDataList.add(newlink);
                             }
-                            result.put(subformTableName.substring(subformTableName.indexOf("_") + 1, subformTableName.lastIndexOf("_")), subformDataList);
+                            result.put(subformTableName.substring(subformTableName.indexOf("_") + 1, subformTableName.lastIndexOf("_")), subDataList);
                             
                         }
                     }
@@ -3074,14 +3305,17 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                 {
                     
                     // 管理员没有领取上限限制
-                    if (isAdmin)
+                    if (!isAdmin)
                     {
                         String day = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
                         sql.setLength(0);
                         sql.append(" select count(1) from ")
-                            .append(DAOUtil.getTableName("module_seapool_setting_detail", companyId))
+                            .append(detailTable)
                             .append(" where take_time='")
                             .append(day)
+                            .append("'")
+                            .append(" and take_by='")
+                            .append(employeeId)
                             .append("'")
                             .append(" and seapool_id=")
                             .append(reqJson.get(Constant.FIELD_SEAPOOL_ID));
@@ -3093,7 +3327,13 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
                         }
                         Integer takeLimit = seaPool.getInteger("take_limit");
                         sql.setLength(0);
-                        sql.append(" select count(1) from ").append(detailTable).append(" where seapool_id='").append(reqJson.get(Constant.FIELD_SEAPOOL_ID)).append("'");
+                        sql.append(" select count(1) from ")
+                            .append(detailTable)
+                            .append(" where take_by='")
+                            .append(employeeId)
+                            .append("' and seapool_id='")
+                            .append(reqJson.get(Constant.FIELD_SEAPOOL_ID))
+                            .append("'");
                         Integer limitCount = DAOUtil.executeCount(sql.toString());
                         if (limitCount >= takeLimit)
                         {
@@ -3399,11 +3639,11 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
     /**
      * 移除布局中的附件、图片 param reqJson
      */
-    private JSONObject removeAttImgObj(JSONObject reqJson)
+    private JSONObject removeAttImgObj(JSONObject reqJson, Map<String, String> fieldBeanMap)
     {
         JSONObject result = new JSONObject();
         JSONObject dataJson = reqJson.getJSONObject("data");
-        JSONObject attImgJSON = new JSONObject();
+        JSONArray attImgArr = new JSONArray();
         LinkedHashMap<String, String> jsonMap = JSON.parseObject(dataJson.toString(), new TypeReference<LinkedHashMap<String, String>>()
         {
         });
@@ -3412,13 +3652,55 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
             String key = entry.getKey();
             if (key.startsWith(Constant.TYPE_PICTURE) || key.startsWith(Constant.TYPE_ATTACHMENT))
             {
+                JSONObject attImgJSON = new JSONObject();
                 attImgJSON.put(key, entry.getValue());
+                attImgArr.add(attImgJSON);
+                fieldBeanMap.put(key, reqJson.getString("bean"));
                 dataJson.remove(key);
+            }
+            // 子表的图片附件处理
+            else if (key.startsWith(Constant.TYPE_SUBFORM))
+            {
+                int idx = 0;
+                JSONArray subArray = JSONArray.parseArray(entry.getValue());
+                JSONArray newSubArray = new JSONArray();
+                for (Object o : subArray)
+                {
+                    idx++;
+                    JSONObject subObj = (JSONObject)o;
+                    JSONObject newSubObj = new JSONObject();
+                    Set<String> keys = subObj.keySet();
+                    Iterator<String> iterator = keys.iterator();
+                    while (iterator.hasNext())
+                    {
+                        String subField = iterator.next();
+                        if (subField.contains(Constant.TYPE_PICTURE) || subField.contains(Constant.TYPE_ATTACHMENT))
+                        {
+                            JSONObject attImgJSON = new JSONObject();
+                            JSONArray subFieldArr = (JSONArray)subObj.get(subField);
+                            for (Object object : subFieldArr)
+                            {
+                                JSONObject subFieldJSON = (JSONObject)object;
+                                subFieldJSON.put("idx", idx);
+                            }
+                            attImgJSON.put(subField, subFieldArr);
+                            attImgArr.add(attImgJSON);
+                            fieldBeanMap.put(subField, reqJson.getString("bean") + "_" + key);
+                            newSubObj.put(subField, "[]");
+                        }
+                        else
+                        {
+                            newSubObj.put(subField, subObj.get(subField));
+                        }
+                    }
+                    newSubArray.add(newSubObj);
+                }
+                dataJson.put(key, newSubArray);
             }
         }
         reqJson.put("data", dataJson);
         result.put("saveJSON", reqJson);
-        result.put("attImgJSON", attImgJSON);
+        result.put("attImgArr", attImgArr);
         return result;
     }
     
@@ -3531,4 +3813,164 @@ public class ModuleOperationAppServiceImpl implements ModuleOperationAppService
         return DAOUtil.executeQuery4JSON(query.toString());
         
     }
+    
+    private String processHandle(JSONObject processJson, String token, long dataId, String beanName, String nextApproverBy)
+    {
+        String result = null;
+        try
+        {
+            InfoVo info = TokenMgr.obtainInfo(token);
+            Long companyId = info.getCompanyId();
+            Long employeeId = info.getEmployeeId();
+            
+            String processName = processJson.getString("process_name");
+            // 流程参数
+            Map<String, Object> processVars = new HashMap<>();
+            processVars.put(ActivitiUtil.VAR_DISTINCTTYPE, processJson.getInteger("approver_duplicate"));
+            processVars.put(ActivitiUtil.VAR_DATA_ID, dataId);
+            if (!StringUtil.isEmpty(nextApproverBy))
+            {
+                processVars.put("nextAssignee", nextApproverBy);
+            }
+            // 启用流程
+            Map<String, String> startMap = ActivitiUtil
+                .startProcess(companyId, processJson.getString("process_key"), employeeId, processVars, System.getProperty("user.dir").concat("/bpmnFiels/"), "已提交", "提交审批", -1);
+            if (!StringUtil.isEmpty(startMap.get("noOutgoing")))
+            {
+                result = "未找到审批人，审批提交失败！";
+                return result;
+            }
+            String processInstanceId = startMap.get("processInstanceId");// 流程属性表中不需要维护实例id，因为同一个模块，每一条数据保存时都会产生一个新的实例id
+            String firstTaskId = startMap.get("firstTaskId");
+            List<Task> tasks = ActivitiUtil.getTasks(companyId, processInstanceId);
+            
+            if (null == processInstanceId)
+            {
+                result = "流程启动失败！";
+                return result;
+            }
+            
+            if (null == tasks || tasks.size() == 0)
+            {
+                result = "未找到审批人，审批提交失败！";
+                return result;
+            }
+            
+            JSONObject empJson = employeeAppService.queryEmployee(employeeId, companyId);
+            StringBuilder setKey = new StringBuilder();
+            setKey.append(companyId);
+            setKey.append("_");
+            setKey.append(processInstanceId);
+            setKey.append("_");
+            setKey.append(RedisKey4Function.PROCESS_BEGIN_USER.getIndex());
+            JedisClusterHelper.set(setKey.toString(), empJson);
+            
+            setKey = new StringBuilder();
+            setKey.append(companyId);
+            setKey.append("_");
+            setKey.append(processInstanceId);
+            setKey.append("_");
+            setKey.append(RedisKey4Function.PROCESS_NAME.getIndex());
+            JedisClusterHelper.set(setKey.toString(), processName);
+            
+            // 将启用流程时缓存的节点字段版本取出，作为新增数据的字段权限版本。
+            StringBuilder key = new StringBuilder();
+            key.append(companyId);
+            key.append("_");
+            key.append(beanName);
+            key.append("_");
+            key.append(processJson.getString("id"));
+            key.append("_");
+            key.append(RedisKey4Function.PROCESS_MODULE_FIELD_V.getIndex());
+            Object fieldVersion = JedisClusterHelper.get(key.toString());
+            if (fieldVersion == null)
+            {
+                JSONObject processFieldV = workflowAppService.getFieldV(companyId.toString(), processJson.getString("id"));
+                if (null != processJson.getString("id"))
+                {
+                    fieldVersion = processFieldV.getJSONObject("fieldVersion").getLong("$numberLong");
+                }
+                else
+                {
+                    log.error(processJson.getString("id").concat("流程，为获取到字段版本"));
+                }
+            }
+            // 构造推送消息
+            JSONObject msgs = new JSONObject();
+            msgs.put("push_content", new StringBuilder("审批：").append(empJson.getString("employee_name")).append("的").append(processName).append("。"));
+            msgs.put("bean_name", beanName);
+            msgs.put("bean_name_chinese", "审批");
+            JSONArray approvalOper = new JSONArray();
+            JSONObject approvalOperJson = new JSONObject();
+            approvalOperJson.put("field_label", "");
+            approvalOperJson.put("field_value", "");
+            approvalOper.add(approvalOperJson);
+            msgs.put("field_info", approvalOper);
+            JSONObject paramFieldsJSON = new JSONObject();
+            paramFieldsJSON.put("dataId", dataId);
+            paramFieldsJSON.put("fromType", "1");// 0我发起的、1待我审批、2我已审批、3抄送到我
+            paramFieldsJSON.put("moduleBean", beanName);
+            msgs.put("param_fields", paramFieldsJSON);
+            
+            // 保存操作记录
+            JSONObject saveObj = new JSONObject();
+            JSONObject paramsObj = new JSONObject();
+            saveObj.put("process_definition_id", processInstanceId);
+            saveObj.put("task_id", firstTaskId);
+            saveObj.put("task_key", Constant.PROCESS_FIELD_FIRST_TASK);
+            saveObj.put("task_name", "开始任务");
+            saveObj.put("task_status_id", Constant.PROCESS_STATUS_COMMIT);
+            saveObj.put("task_status_name", "已提交");
+            saveObj.put("approval_employee_id", employeeId.toString());
+            saveObj.put("approval_message", "提交审批");
+            paramsObj.put("token", token);
+            paramsObj.put("type", Constant.PROCESS_STATUS_COMMIT);
+            paramsObj.put("dataId", dataId);
+            paramsObj.put("moduleBean", beanName);
+            paramsObj.put("firstTaskId", firstTaskId);
+            paramsObj.put("pushMsg", msgs);
+            workflowAppService.saveApprovedTask(saveObj, paramsObj);
+            
+            // 保存审批申请
+            saveObj = new JSONObject();
+            saveObj.put("process_key", processJson.getString("process_key"));
+            saveObj.put("process_name", processName);
+            saveObj.put("process_definition_id", processInstanceId);
+            saveObj.put("process_status", Constant.PROCESS_STATUS_WAIT_APPROVAL);
+            saveObj.put("process_v", processJson.getLong("id"));
+            saveObj.put("process_field_v", (Long)fieldVersion);
+            saveObj.put("task_id", firstTaskId);
+            saveObj.put("module_bean", processJson.getString("module_bean"));
+            saveObj.put("approval_data_id", dataId);
+            saveObj.put("begin_user_id", employeeId);
+            saveObj.put("begin_user_name", empJson.getString("employee_name"));
+            saveObj.put(Constant.FIELD_DEL_STATUS, 0);
+            saveObj.put("create_time", System.currentTimeMillis());
+            workflowAppService.saveProcessApproval(saveObj, token);
+            return result;
+        }
+        catch (Exception e)
+        {
+            return "-----------------";
+        }
+    }
+    
+    @Override
+    public String getModuleIdByModule(String token, String bean)
+    {
+        InfoVo info = TokenMgr.obtainInfo(token);
+        Long companyId = info.getCompanyId();
+        // 获取模块ID
+        StringBuilder queryModuleId = new StringBuilder();
+        queryModuleId.append("select id, chinese_name from ").append(DAOUtil.getTableName("application_module", companyId)).append(" where english_name='").append(bean).append(
+            "'");
+        JSONObject jsonOj = DAOUtil.executeQuery4FirstJSON(queryModuleId.toString());
+        if (jsonOj != null)
+        {
+            return jsonOj.getString("id");
+        }
+        return "";
+        
+    }
+    
 }

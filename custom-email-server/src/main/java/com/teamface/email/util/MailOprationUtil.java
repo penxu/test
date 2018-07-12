@@ -151,7 +151,7 @@ public class MailOprationUtil
         throws MessagingException
     {
         @SuppressWarnings("static-access")
-        InternetAddress[] iaToList = new InternetAddress().parse(toRecipents);
+        InternetAddress[] iaToList = InternetAddress.parse(toRecipents);
         msg.setRecipients(Message.RecipientType.TO, iaToList);
     }
     
@@ -165,7 +165,7 @@ public class MailOprationUtil
         throws MessagingException
     {
         @SuppressWarnings("static-access")
-        InternetAddress[] iaCcList = new InternetAddress().parse(ccRecipents);
+        InternetAddress[] iaCcList = InternetAddress.parse(ccRecipents);
         msg.setRecipients(Message.RecipientType.CC, iaCcList);
     }
     
@@ -179,7 +179,7 @@ public class MailOprationUtil
         throws MessagingException
     {
         @SuppressWarnings("static-access")
-        InternetAddress[] iaBccList = new InternetAddress().parse(bccRecipents);
+        InternetAddress[] iaBccList = InternetAddress.parse(bccRecipents);
         msg.setRecipients(Message.RecipientType.BCC, iaBccList);
     }
     
@@ -403,7 +403,7 @@ public class MailOprationUtil
         {
             JSONObject attach = attachs.getJSONObject(i);
             String fileName = attach.getString("file_name");
-            Map<String, String> paraMap = HttpRequstUtil.URLRequest(attach.getString("file_url"));
+            Map<String, String> paraMap = HttpRequstUtil.urlRequest(attach.getString("file_url"));
             if (paraMap.size() > 1)
             {
                 // 邮件同步的附件

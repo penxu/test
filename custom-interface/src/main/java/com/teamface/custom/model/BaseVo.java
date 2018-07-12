@@ -57,26 +57,43 @@ public class BaseVo implements Serializable, Comparable<BaseVo>
     @Override
     public String toString()
     {
-        return "BaseVo [id=" + id + ", createDate=" + createDate + ", disabled="
-            + disabled + "]";
+        return "BaseVo [id=" + id + ", createDate=" + createDate + ", disabled=" + disabled + "]";
     }
     
     @Override
     public int compareTo(BaseVo o)
     {// 按创建时间倒序排列
-        // TODO Auto-generated method stub
+     // TODO Auto-generated method stub
         if (this == null || o == null)
+        {
             return -1;
+        }
+        
         if (this.getCreateDate() == null && o.getCreateDate() == null)
+        {
             return 0;
+        }
+        
         if (this.getCreateDate() == null)
+        {
             return 1;
+        }
+        
         if (o.getCreateDate() == null)
+        {
             return -1;
+        }
+        
         if (this.getCreateDate() < o.getCreateDate())
+        {
             return 1;
+        }
+        
         if (this.getCreateDate() > o.getCreateDate())
+        {
             return -1;
+        }
+        
         return 0;
     }
     
@@ -92,20 +109,29 @@ public class BaseVo implements Serializable, Comparable<BaseVo>
     @Override
     public boolean equals(Object obj)
     {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+            
+        if (getClass() != obj.getClass()) {
             return false;
+        }
+            
         BaseVo other = (BaseVo)obj;
         if (id == null)
         {
-            if (other.id != null)
+            if (other.id != null) {
                 return false;
+            }
+                
         }
-        else if (id.longValue() != other.id.longValue())
+        else if (id.longValue() != other.id.longValue()) {
             return false;
+        }
+            
         return true;
     }
     

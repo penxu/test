@@ -79,9 +79,9 @@ public class ProjectManagementLayoutController
      * @Description:初始化项目自定义布局
      */
     @RequestMapping(value = "/saveInitialLayout", method = RequestMethod.GET)
-    public @ResponseBody JSONObject saveInitialLayout(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    public @ResponseBody JSONObject saveInitialLayout(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token, @RequestParam(required = false) Long companyId)
     {
-        projectManagementLayoutService.saveInitialLayout(token);
+        projectManagementLayoutService.saveInitialLayout(token, companyId);
         return JsonResUtil.getSuccessJsonObject();
     }
 }

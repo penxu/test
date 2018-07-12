@@ -23,7 +23,7 @@ public class MailBackOperationServiceImpl implements MailBackOperationService
     private ServiceResultCodeCache resultCode = ServiceResultCodeCache.getInstance();
     
     @Override
-    public JSONObject blurMail(String token, String subject, String sender_name, Integer type, Integer pageNum, Integer pageSize, Long start_time, Long end_time)
+    public JSONObject blurMail(String token, String subject, String senderName, Integer type, Integer pageNum, Integer pageSize, Long startTime, Long endTime)
     {
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
@@ -51,17 +51,17 @@ public class MailBackOperationServiceImpl implements MailBackOperationService
         {
             querySQLSB.append(" and mb.subject like '%").append(subject).append("%'");
         }
-        if (!StringUtil.isBlank(sender_name))
+        if (!StringUtil.isBlank(senderName))
         {
-            querySQLSB.append(" and mb.from_recipient like '%").append(sender_name).append("%'");
+            querySQLSB.append(" and mb.from_recipient like '%").append(senderName).append("%'");
         }
-        if (null != start_time)
+        if (null != startTime)
         {
-            querySQLSB.append(" and mbs.create_time > ").append(start_time);
+            querySQLSB.append(" and mbs.create_time > ").append(startTime);
         }
-        if (null != end_time)
+        if (null != startTime)
         {
-            querySQLSB.append(" and mbs.create_time < ").append(end_time);
+            querySQLSB.append(" and mbs.create_time < ").append(endTime);
         }
         querySQLSB.append(" and mbs.del_status = 0").append(" order by mbs.id desc");
         return BusinessDAOUtil.getTableDataListAndPageInfo(querySQLSB.toString(), pageSize, pageNum);

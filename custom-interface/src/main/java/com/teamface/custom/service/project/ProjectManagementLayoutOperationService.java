@@ -1,6 +1,7 @@
 package com.teamface.custom.service.project;
 
 import java.util.List;
+import java.util.Map;
 
 import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.model.ServiceResult;
@@ -61,4 +62,13 @@ public interface ProjectManagementLayoutOperationService
      * @Description:获取自定义布局业务数据的详情
      */
     public List<JSONObject> queryDataList(String token, String bean, String ids);
+    
+    /**
+     * 
+     * @param token 接口凭证
+     * @param map 接口参数
+     * @return
+     * @Description: 项目复制任务接口
+     */
+    public Map<String, Map> copyCustomData(String token, Map<String, Map> map);
 }

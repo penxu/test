@@ -229,10 +229,11 @@ public interface ModuleDataAuthAppService
     
     /**
      * 
-     * @param reqMap
-     * @return
-     * @Description:获取模块数据中的权限
+    * @param moduleBean
+    * @param token
+    * @return
+    * @Description:获取模块的数据差看权限
      */
-    public JSONObject getReadAuthFromModule(Map<String, String> reqMap);
+    public JSONObject getAuthByModule(String moduleBean, String token, String clienFlag);
     
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,7 @@ import com.teamface.common.util.dao.BusinessDAOUtil;
 import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.common.util.dao.JSONParser4SQL;
 import com.teamface.common.util.dao.JedisClusterHelper;
+import com.teamface.common.util.dao.LayoutUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
 import com.teamface.custom.service.employee.EmployeeAppService;
@@ -174,7 +176,7 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
      * @return
      * @Description:查询 > 审批列表 - 我已审批
      */
-    public JSONObject queryCompleteList(JSONObject reqJson, String token)
+    public JSONObject queryCompleteList(boolean imFlag, JSONObject reqJson, String token)
     {
         log.debug("start !");
         JSONObject result = new JSONObject();
@@ -189,7 +191,10 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
             String employeeTable = DAOUtil.getTableName("employee", companyId);
             // 查询（动作：通过、驳回、转交）（状态：审批中、审批通过、审批驳回）数据
             StringBuilder querySql = new StringBuilder();
-            querySql.append("SELECT a.*, t4.task_key, (select emp.picture from ");
+            querySql.append("SELECT a.*, CASE WHEN t4.task_key = 'endEvent' THEN (select task_key from ");
+            querySql.append(flowTable);
+            querySql
+                .append(" where process_definition_id = a.process_definition_id order by id desc limit 1 OFFSET 1) ELSE t4.task_key END AS task_key, (select emp.picture from ");
             querySql.append(employeeTable);
             querySql.append(" emp where emp.id = A.begin_user_id) as picture,t4.task_name FROM ");
             querySql.append(approvalTable);
@@ -199,10 +204,15 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
             querySql.append(flowTable);
             querySql.append(" t1, ");
             querySql.append(approvalTable);
-            querySql.append(" t2 WHERE t1.approval_employee_id = ");
-            querySql.append(info.getEmployeeId());
+            querySql.append(" t2 WHERE");
+            if (!imFlag)
+            {
+                querySql.append(" t1.approval_employee_id = ");
+                querySql.append(info.getEmployeeId());
+                querySql.append(" AND");
+            }
             querySql.append(
-                " AND (t1.task_status_id IN ('2', '3') or (t1.task_status_id = '5' and t2.process_status IN (0, 1, 2, 3, 6))) AND t1.process_definition_id = t2.process_definition_id AND (t2.process_status IN (1, 2, 3, 6) or (t2.process_status = 0 and t1.task_status_id = '5'))");
+                " (t1.task_status_id IN ('2', '3') or (t1.task_status_id = '5' and t2.process_status IN (0, 1, 2, 3, 6))) AND t1.process_definition_id = t2.process_definition_id AND (t2.process_status IN (1, 2, 3, 6) or (t2.process_status = 0 and t1.task_status_id = '5'))");
             querySql.append(
                 " GROUP BY t1.process_definition_id) AS maxTimeMsg WHERE maxTimeMsg.process_definition_id = curMsg.process_definition_id AND maxTimeMsg.approvaltime = curMsg.approval_time) t4 WHERE a.process_definition_id = t4.process_definition_id");
             
@@ -344,7 +354,7 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
         }
         else if (type == 2)
         {// 我已审批
-            return queryCompleteList(reqJson, token);
+            return queryCompleteList(false, reqJson, token);
         }
         else if (type == 3)
         {// 抄送到我
@@ -386,7 +396,7 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
         }
         else if ("2".equals(type))
         {
-            objectList = queryCompleteList(JSONObject.parseObject(reqJsonStr), token);
+            objectList = queryCompleteList(true, JSONObject.parseObject(reqJsonStr), token);
         }
         else if ("3".equals(type))
         {
@@ -675,7 +685,9 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
                 JSONObject where = new JSONObject();
                 where.put("id", moduleDataId);
                 whereJson.put("where", where);
-                Map<String, String> queryMap = JSONParser4SQL.getQuerySql(companyId.toString(), moduleBean, findFields, null, null, whereJson, false);
+                List<String> fields = new ArrayList<>();
+                fields.add("picture");
+                Map<String, String> queryMap = JSONParser4SQL.getQuerySql(companyId.toString(), moduleBean, findFields, null, fields, whereJson, false);
                 String findSql = queryMap.get("sql");
                 
                 // 业务表
@@ -686,40 +698,41 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
                 // 获取子表单数据
                 if (subformFields.size() > 0)
                 {
+                    String refId = moduleBean.concat("_id");
                     for (JSONObject jsonObject : subformFields)
                     {
-                        StringBuilder subFields = new StringBuilder();
                         JSONObject componentJson = jsonObject.getJSONObject("componentList");
-                        String fieldId = componentJson.getString("field");
-                        JSONArray componentList = componentJson.getJSONArray("componentList");
-                        
-                        for (Object object : componentList)
+                        String subformTableName = componentJson.getString("field");
+                        String subBeanName = moduleBean.concat("_").concat(subformTableName);
+                        StringBuilder subFields = new StringBuilder();
+                        List<String> fieldsList = LayoutUtil.getSubEnableFields(companyId.toString(), moduleBean, "0", subFields);
+                        // 获取表字段注释
+                        Map<String, String> subCommentMap = BusinessDAOUtil.getTableColumnComment(subBeanName, companyId.toString());
+                        List<String> subfields = new ArrayList<String>();
+                        subfields.add("picture");
+                        // 获取查询sql
+                        String subquerySql = JSONParser4SQL.getSubListSQL(companyId.toString(), subBeanName, subfields, refId, moduleDataId, subCommentMap);
+                        Map<String, String> sqlMap = new HashMap<String, String>();
+                        sqlMap.put("sql", subquerySql.replaceAll(subBeanName, subBeanName.concat("_approval")));
+                        List<LinkedHashMap<String, Object>> subformDataList = BusinessDAOUtil.getTableDataList(subCommentMap, sqlMap, fieldsList);
+                        List<LinkedHashMap<String, Object>> subDataList = new ArrayList<>();
+                        for (LinkedHashMap<String, Object> link : subformDataList)
                         {
-                            JSONObject subField = (JSONObject)object;
-                            subFields.append(subField.getString("name")).append(", ");
-                        }
-                        if (subFields.length() > 0)
-                        {
-                            String refId = moduleBean.concat("_id");
-                            querySql.setLength(0);
-                            querySql.append("select ").append(subFields.substring(0, subFields.lastIndexOf(","))).append(" from ");
-                            querySql.append(moduleBean).append("_").append(fieldId).append("_approval_").append(companyId);
-                            querySql.append(" where ").append(refId).append(" = ").append(moduleDataId);
-                            List<JSONObject> subDataList = DAOUtil.executeQuery4JSON(querySql.toString());
-                            for (JSONObject subDataJSON : subDataList)
+                            if (link.containsKey("id"))
                             {
-                                Set<String> keys = subDataJSON.keySet();
-                                for (String key : keys)
-                                {
-                                    if (key.startsWith(Constant.TYPE_SUBFORM.concat("_").concat(Constant.TYPE_PICTURE))
-                                        || key.startsWith(Constant.TYPE_SUBFORM.concat("_").concat(Constant.TYPE_ATTACHMENT)))
-                                    {
-                                        subDataJSON.put(key, subDataJSON.getJSONArray(key));
-                                    }
-                                }
+                                link.remove("id");
                             }
-                            approvalJson.put(fieldId, subDataList);
+                            if (link.containsKey(Constant.FIELD_DEL_STATUS))
+                            {
+                                link.remove(Constant.FIELD_DEL_STATUS);
+                            }
+                            if (link.containsKey(refId))
+                            {
+                                link.remove(refId);
+                            }
+                            subDataList.add(link);
                         }
+                        approvalJson.put(subformTableName, subformDataList);
                     }
                 }
                 
@@ -727,7 +740,7 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
                 if (attImgFields.length() > 0)
                 {
                     StringBuilder attImgSB = new StringBuilder();
-                    attImgSB.append("select * from attachment_");
+                    attImgSB.append("select * from attachment_approval_");
                     attImgSB.append(companyId);
                     attImgSB.append(" where data_id = ");
                     attImgSB.append(moduleDataId);
@@ -777,10 +790,27 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
             Set<String> keys = approvalJson.keySet();
             for (String key : keys)
             {
-                if (key.startsWith(Constant.TYPE_PICTURE) || key.startsWith(Constant.TYPE_ATTACHMENT))
+                String subApprovalBean = moduleBean.concat("_").concat(key);//.concat("_approval")
+                if (key.startsWith(Constant.TYPE_SUBFORM))
                 {
-                    List<JSONObject> attachmentList = moduleOperationAppService.findAttachmentList(approvalJson.getInteger("id"), companyId, key);
-                    approvalJson.put(key, attachmentList);
+                    JSONArray subformArr = approvalJson.getJSONArray(key);
+                    int idx = 0;
+                    for (Object subformObj : subformArr)
+                    {
+                        idx ++;
+                        JSONObject subformJSON = (JSONObject)subformObj;
+                        Set<String> subformKeys = subformJSON.keySet();
+                        for (String subformKey : subformKeys)
+                        {
+                            if (subformKey.contains(Constant.TYPE_PICTURE) || subformKey.contains(Constant.TYPE_ATTACHMENT))
+                            {
+                                List<JSONObject> attachmentList =
+                                    moduleOperationAppService.findAttachmentList(approvalJson.getInteger("id"), companyId, subformKey, subApprovalBean, true, idx);
+                                subformJSON.put(subformKey, attachmentList);
+                            }
+                        }
+                    }
+                    approvalJson.put(key, subformArr);
                 }
             }
             StringBuilder beginUserKey = new StringBuilder();
@@ -883,7 +913,7 @@ public class ApprovalAppServiceImpl implements ApprovalAppService
                     queryBuilder.append(definitionId);
                     queryBuilder.append("' and  string_to_array(cc_to, ',') @>  ARRAY ['");
                     queryBuilder.append(employeeId);
-                    queryBuilder.append("'");
+                    queryBuilder.append("']");
                     number = DAOUtil.executeCount(queryBuilder.toString());
                 }
                 if (number > 0) // 有则添加

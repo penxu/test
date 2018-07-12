@@ -26,7 +26,7 @@ public class ValidateConnectionUtil
 {
     private static final Logger log = LogManager.getLogger(MailOprationUtil.class);
     
-    private String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
+    private static final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
     
     private Properties props;
     

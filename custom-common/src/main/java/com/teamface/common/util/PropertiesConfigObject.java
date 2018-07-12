@@ -40,11 +40,19 @@ public class PropertiesConfigObject
         try
         {
             Parameters params = new Parameters();
-            FileBasedConfigurationBuilder<FileBasedConfiguration> commentBuilder = new FileBasedConfigurationBuilder<FileBasedConfiguration>(PropertiesConfiguration.class)
-                .configure(params.properties().setFileName("common.properties").setListDelimiterHandler(new DefaultListDelimiterHandler(',')));
             FileBasedConfigurationBuilder<FileBasedConfiguration> configBuilder = new FileBasedConfigurationBuilder<FileBasedConfiguration>(PropertiesConfiguration.class)
                 .configure(params.properties().setFileName("config.properties").setListDelimiterHandler(new DefaultListDelimiterHandler(',')));
             config = configBuilder.getConfiguration();
+        }
+        catch (Exception e)
+        {
+            log.error(e.toString());
+        }
+        try
+        {
+            Parameters params = new Parameters();
+            FileBasedConfigurationBuilder<FileBasedConfiguration> commentBuilder = new FileBasedConfigurationBuilder<FileBasedConfiguration>(PropertiesConfiguration.class)
+                .configure(params.properties().setFileName("common.properties").setListDelimiterHandler(new DefaultListDelimiterHandler(',')));
             comment = commentBuilder.getConfiguration();
         }
         catch (Exception e)

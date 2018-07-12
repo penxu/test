@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.teamface</groupId>
@@ -9,7 +10,7 @@
 	<url>http://maven.apache.org</url>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<package.environment>production</package.environment><!-- 这里指定运行的环境是开发环境,当Maven打包时会打包这里指定的配置文件 -->
+		<package.environment>test</package.environment><!-- 这里指定运行的环境是开发环境,当Maven打包时会打包这里指定的配置文件 -->
 		<spring.version>4.1.6.RELEASE</spring.version>
 	</properties>
 	<!-- 不同环境对应不同的配置文件！ -->
@@ -40,6 +41,12 @@
 			<groupId>com.teamface</groupId>
 			<artifactId>custom-interface</artifactId>
 			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.caucho</groupId>
+			<artifactId>hessian</artifactId>
+			<version>4.0.7</version>
 		</dependency>
 	</dependencies>
 

@@ -33,7 +33,7 @@
 		<property name="validationQuery" value="SELECT 1" />
 		<property name="testWhileIdle" value="true" />
 		<property name="testOnBorrow" value="true" />
-		<property name="testOnReturn" value="false" />
+		<property name="testOnReturn" value="true" />
 	</bean>
 
 	<!-- 慢SQL记录 *start* -->
@@ -101,54 +101,6 @@
 		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
 		<property name="corePoolSize" value="10" />
 		<property name="maxPoolSize" value="30" />
-	</bean>
-
-	<!-- jedis 配置 -->
-	<bean id="jedisPoolConfig" class="redis.clients.jedis.JedisPoolConfig">
-		<!-- 最大空闲数 -->
-		<property name="maxIdle" value="100" />
-		<!-- 最大建立连接等待时间 -->
-		<property name="maxWaitMillis" value="1000" />
-		<!-- 是否在从池中取出连接前进行检验,如果检验失败,则从池中去除连接并尝试取出另一个 -->
-		<property name="testOnBorrow" value="true" />
-		<property name="maxTotal" value="1000" />
-		<property name="minIdle" value="8" />
-	</bean>
-
-	<bean id="jedisCluster" name="jedisCluster" class="redis.clients.jedis.JedisCluster">
-		<constructor-arg index="0">
-			<set>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.221"></constructor-arg>
-					<constructor-arg index="1" value="7000"></constructor-arg>
-				</bean>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.221"></constructor-arg>
-					<constructor-arg index="1" value="7001"></constructor-arg>
-				</bean>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.221"></constructor-arg>
-					<constructor-arg index="1" value="7002"></constructor-arg>
-				</bean>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.222"></constructor-arg>
-					<constructor-arg index="1" value="7003"></constructor-arg>
-				</bean>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.222"></constructor-arg>
-					<constructor-arg index="1" value="7004"></constructor-arg>
-				</bean>
-				<bean class="redis.clients.jedis.HostAndPort">
-					<constructor-arg index="0" value="192.168.1.222"></constructor-arg>
-					<constructor-arg index="1" value="7005"></constructor-arg>
-				</bean>
-			</set>
-		</constructor-arg>
-		<constructor-arg index="1" value="100000"></constructor-arg>
-		<constructor-arg index="2" value="100000"></constructor-arg>
-		<constructor-arg index="3" value="5"></constructor-arg>
-		<constructor-arg index="4" value="hjhq2016"></constructor-arg>
-		<constructor-arg index="5" ref="jedisPoolConfig"></constructor-arg>
 	</bean>
 
 	<bean id="springContextUtil" class="com.teamface.common.util.SpringContextUtil"></bean>

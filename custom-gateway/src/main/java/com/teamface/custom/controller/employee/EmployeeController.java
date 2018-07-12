@@ -77,7 +77,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -120,7 +120,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -151,7 +151,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         
@@ -189,7 +189,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -233,7 +233,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -267,7 +267,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -302,7 +302,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -341,7 +341,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -369,7 +369,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -404,7 +404,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -421,7 +421,7 @@ public class EmployeeController
     @RequestMapping(value = "/savaDepartment", method = RequestMethod.POST)
     public @ResponseBody JSONObject savaDepartment(@RequestBody(required = true) String reqJsonStr, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
     {
-        JSONObject  jsonObject = new JSONObject();
+        JSONObject jsonObject = new JSONObject();
         try
         {
             JSONObject layoutJson = JSONObject.parseObject(reqJsonStr);
@@ -437,13 +437,14 @@ public class EmployeeController
             map.put("parentId", parentId);
             map.put("token", token);
             jsonObject = employeeAppService.savaDepartment(map);
-            if(null != jsonObject.get("departmentId")) {
+            if (null != jsonObject.get("departmentId"))
+            {
                 return JsonResUtil.getSuccessJsonObject(jsonObject);
             }
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -482,7 +483,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -519,7 +520,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -543,7 +544,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -580,7 +581,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -619,7 +620,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -653,7 +654,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getResultJsonObject(serviceResult.getCode(), serviceResult.getObj());
@@ -694,7 +695,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getResultJsonObject(serviceResult.getCode(), serviceResult.getObj());
@@ -723,7 +724,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -786,7 +787,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -817,7 +818,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -847,7 +848,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -885,7 +886,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject();
@@ -909,8 +910,8 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e);
-            e.printStackTrace();
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject(resultMap);
     }
@@ -936,8 +937,8 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e);
-            e.printStackTrace();
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject(resultMap);
     }
@@ -956,8 +957,8 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e);
-            e.printStackTrace();
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getFailJsonObject();
         }
         return JsonResUtil.getSuccessJsonObject(resultMap);
     }
@@ -988,7 +989,7 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
     }
@@ -1019,9 +1020,39 @@ public class EmployeeController
         }
         catch (Exception e)
         {
-            LOG.error(e.getMessage());
+            LOG.error(e.getMessage(), e);
             return JsonResUtil.getFailJsonObject();
         }
+    }
+    
+    /**
+     * 
+     * 项目人员卡片信息
+     * 
+     * @param request
+     * @param token
+     * @return
+     * @Description:
+     */
+    @RequestMapping(value = "/queryProjectEmployee", method = RequestMethod.GET)
+    public @ResponseBody JSONObject queryProjectEmployee(HttpServletRequest request, @RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token)
+    {
+        JSONObject resultMap = new JSONObject();
+        try
+        {
+            String employeeId = request.getParameter("employeeId");
+            if (StringUtils.isBlank(employeeId))
+            {
+                return JsonResUtil.getResultJsonByIdent("common.req.param.error");
+            }
+            resultMap = employeeAppService.queryProjectEmployee(employeeId, token);
+        }
+        catch (Exception e)
+        {
+            LOG.error(e.getMessage(), e);
+            return JsonResUtil.getFailJsonObject();
+        }
+        return JsonResUtil.getSuccessJsonObject(resultMap);
     }
     
 }

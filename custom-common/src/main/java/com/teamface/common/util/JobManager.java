@@ -48,6 +48,7 @@ public class JobManager
         waitrnum = Constant.JOB_WAIT_COUNT;
         ThreadFactory threadFactory = new ThreadFactory()
         {
+            @Override
             public Thread newThread(Runnable r)
             {
                 Thread t = new Thread(r);

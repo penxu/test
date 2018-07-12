@@ -145,4 +145,34 @@ public class ProjectSettingController
         return JsonResUtil.getSuccessJsonObject(labelsList);
     }
     
+    /**
+     * 
+     * @param token
+     * @param jsonStr
+     * @return
+     * @Description:项目设置当前进度修改
+     */
+    @RequestMapping(value = "/editProgress", method = RequestMethod.POST, consumes = "application/json")
+    public @ResponseBody JSONObject editProgress(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token, @RequestBody(required = true) String jsonStr)
+    {
+        ServiceResult<String> returnMSG = projectSettingService.editProgress(token, jsonStr);
+        return JsonResUtil.getResultJsonObject(returnMSG.getCode(), returnMSG.getObj());
+    }
+    
+    /**
+     * 
+     * @param token
+     * @param jsonStr
+     * @return
+     * @Description:项目任务设置，修改任务排序与任务设置
+     */
+    @RequestMapping(value = "/editTaskSort", method = RequestMethod.POST, consumes = "application/json")
+    public @ResponseBody JSONObject editTaskSort(@RequestHeader(DataTypes.REQUEST_HEADER_TOKEN) String token, @RequestBody(required = true) String jsonStr)
+    {
+        ServiceResult<String> returnMSG = projectSettingService.editTaskSort(token, jsonStr);
+        return JsonResUtil.getResultJsonObject(returnMSG.getCode(), returnMSG.getObj());
+    }
+    
+    
+    
 }

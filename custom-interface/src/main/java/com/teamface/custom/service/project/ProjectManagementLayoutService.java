@@ -43,11 +43,11 @@ public interface ProjectManagementLayoutService
     /**
      * 
      * @param token
-     * @param layout 自定义布局信息
+     * @param companyId 公司ID
      * @return
      * @Description:初始化公司自定义参数
      */
-    public boolean saveInitialLayout(String token);
+    public boolean saveInitialLayout(String token, Long companyId);
     
     /**
      * 

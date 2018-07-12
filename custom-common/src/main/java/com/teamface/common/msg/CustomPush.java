@@ -3,19 +3,9 @@ package com.teamface.common.msg;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import com.teamface.common.msg.constant.MsgConstant;
 import com.teamface.common.msg.pojo.LoginRequestPojo;
-import com.teamface.common.msg.pojo.PushPojo;
 import com.teamface.common.msg.util.ParseTxtFromFile;
 import com.teamface.common.util.dao.JedisClusterHelper;
 
@@ -27,7 +17,6 @@ import com.teamface.common.util.dao.JedisClusterHelper;
  */
 public class CustomPush
 {
-    private static final Logger log = LogManager.getLogger(CustomPush.class);
     
     private static boolean isLogin = false;
     
@@ -95,56 +84,6 @@ public class CustomPush
     {
         
         boolean pushResult = false;
-        
-        final ExecutorService exec = Executors.newFixedThreadPool(1);
-        
-        Callable<Boolean> call = new Callable<Boolean>()
-        {
-            public Boolean call()
-                throws Exception
-            {
-                TcpClientSocket client = TcpClientSocket.getInstance();
-                
-                // 外层包头
-                byte[] outerHead = client.setOuterHead(content.getBytes().length);
-                
-                login();
-                
-                // 命令包头
-                byte[] cmdHead = client.setCmdHead(110, MsgConstant.IM_USER_DEFINED_PERSONAL_CMD, senderID, receiverID);
-                
-                // 推送内容
-                PushPojo pushPojo = new PushPojo();
-                pushPojo.setMessage(content);
-                
-                // 请求数据
-                byte[] reqData = client.mergeRequestInfo(outerHead, cmdHead, pushPojo.getMessage().getBytes());
-                
-                // 发送请求
-                client.send(reqData);
-                return client.getPushResponse(senderID, receiverID);
-            }
-        };
-        
-        try
-        {
-            Future<Boolean> future = exec.submit(call);
-            pushResult = future.get(1000 * 5, TimeUnit.MILLISECONDS); // 任务处理超时时间设为
-                                                                      // 5 秒
-            System.out.println("执行结果:" + pushResult);
-        }
-        catch (TimeoutException ex)
-        {
-            log.error(ex.getMessage(), ex);
-            return false;
-        }
-        catch (Exception e)
-        {
-            log.error(e.getMessage(), e);
-            return false;
-        }
-        // 关闭线程池
-        exec.shutdown();
         
         // 返回执行结果
         return pushResult;

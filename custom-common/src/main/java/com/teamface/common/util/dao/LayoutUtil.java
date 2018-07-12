@@ -742,6 +742,20 @@ public class LayoutUtil
     public static boolean saveModuleSetLayout(JSONObject moduleFieldJson, String collName)
         throws Exception
     {
+        // 组装查询条件
+        JSONObject object = (JSONObject)moduleFieldJson.get("basics");
+        if (null != object)
+        {
+            Document queryDoc = new Document();
+            queryDoc.put("bean", moduleFieldJson.getString("bean"));
+            queryDoc.put("companyId", moduleFieldJson.getString("companyId"));
+            queryDoc.put("basics.title", object.getString("title"));
+            // 查询数据 如果该名字已经存在则不允许新增
+            List<JSONObject> list = findDocs(queryDoc, Constant.FIELD_COLLECTION);
+            if (!list.isEmpty() && list.size() == 1)
+                return false;
+        }
+        
         Document doc = new Document();
         doc.putAll(moduleFieldJson);
         // 保存最新模块信息到mongoDB
@@ -776,6 +790,27 @@ public class LayoutUtil
     {
         String id = layoutJson.getString("id");
         layoutJson.remove("id");
+        
+        // 组装查询条件
+        JSONObject object = (JSONObject)layoutJson.get("basics");
+        if (null != object)
+        {
+            Document queryDoc = new Document();
+            queryDoc.put("bean", layoutJson.getString("bean"));
+            queryDoc.put("companyId", layoutJson.getString("companyId"));
+            queryDoc.put("basics.title", object.getString("title"));
+            // 查询数据 如果该名字已经存在则不允许新增
+            List<JSONObject> list = findDocs(queryDoc, Constant.FIELD_COLLECTION);
+            if (!list.isEmpty())
+                for (JSONObject l : list)
+                {
+                    JSONObject jo = (JSONObject)l.get("_id");
+                    String oid = jo.getString("$oid");
+                    if (!id.equals(oid))
+                        return false;
+                }
+        }
+        
         // 修改数据
         Document newDoc = new Document();
         newDoc.putAll(layoutJson);
@@ -984,6 +1019,17 @@ public class LayoutUtil
                     refModule.put("show", "1");
                     refArr.add(refModule);
                 }
+                else if (type.equals("department"))
+                {// 人员组件
+                    JSONObject refModule = new JSONObject();
+                    refModule.put("field", tmpRow.getString("name"));
+                    refModule.put("referenceBean", "department");
+                    refModule.put("referenceLabel", "部门");
+                    refModule.put("referenceField", "department_name");
+                    refModule.put("multi", chooseType);
+                    refModule.put("show", "1");
+                    refArr.add(refModule);
+                }
                 else if (type.equals("subform"))
                 {// 子表单
                  // 组装参数保存到子表单关联关系 subform_relation
@@ -1059,7 +1105,8 @@ public class LayoutUtil
         mongoDB.insert(Constant.RELATION_COLLECTION, saveDoc);
         
         // 缓存关联关系
-        JedisClusterHelper.set(new StringBuilder(companyId).append("_").append(bean).append("_").append(RedisKey4Function.LAYOUT_RELATION.getIndex()).toString(), relationJson);
+        JedisClusterHelper.set(new StringBuilder(companyId).append("_").append(bean).append("_").append(RedisKey4Function.LAYOUT_RELATION.getIndex()).toString(),
+            relationJson.toJSONString());
         return true;
     }
     
@@ -1273,7 +1320,7 @@ public class LayoutUtil
         queryDoc.append(QueryOperators.AND,
             new BasicDBObject[] {new BasicDBObject("reference.referenceBean", beanName), new BasicDBObject("companyId", companyId),
                 new BasicDBObject("pageNum", pageNum == null ? "0" : pageNum)});
-                
+        
         MongoCursor<Document> mcDoc = mongoDB.find(Constant.RELATION_COLLECTION, queryDoc);
         while (mcDoc.hasNext())
         {
@@ -1398,7 +1445,7 @@ public class LayoutUtil
      * @return List
      * @Description:获取模块的所有关联关系模块
      */
-    public static List<JSONObject> getRelationsByCurrentBeanForPc(String companyId, String beanName, String pageNum, String title, int filter)
+    public static List<JSONObject> getRelationsByCurrentBeanForPc(String companyId, String beanName, String pageNum, String title, int filter, String flag)
     {
         List<JSONObject> result = new ArrayList<>();
         // 条件
@@ -1476,19 +1523,21 @@ public class LayoutUtil
             });
         }
         
-        // 查询子表单中是否存在关联关系
-        Document querySubformDoc = new Document();
-        querySubformDoc.put("referenceBean", beanName);
-        querySubformDoc.put("companyId", companyId);
-        MongoCursor<Document> mcSubformDoc = mongoDB.find(Constant.SUBFORM_RELATION_TABLES_COLLECTION, querySubformDoc);
-        while (mcSubformDoc.hasNext())
-        {
-            JSONObject subformJson = JSONObject.parseObject(mcSubformDoc.next().toJson());
-            JSONObject resultJson = new JSONObject();
-            resultJson.put("value", subformJson.get("subformName"));
-            resultJson.put("label", subformJson.get("lable"));
-            resultJson.put("subform", subformJson.getJSONArray("subformField"));
-            result.add(resultJson);
+        if ("1".equals(flag))
+        {// 查询子表单中是否存在关联关系
+            Document querySubformDoc = new Document();
+            querySubformDoc.put("referenceBean", beanName);
+            querySubformDoc.put("companyId", companyId);
+            MongoCursor<Document> mcSubformDoc = mongoDB.find(Constant.SUBFORM_RELATION_TABLES_COLLECTION, querySubformDoc);
+            while (mcSubformDoc.hasNext())
+            {
+                JSONObject subformJson = JSONObject.parseObject(mcSubformDoc.next().toJson());
+                JSONObject resultJson = new JSONObject();
+                resultJson.put("value", subformJson.get("subformName"));
+                resultJson.put("label", subformJson.get("lable"));
+                resultJson.put("subform", subformJson.getJSONArray("subformField"));
+                result.add(resultJson);
+            }
         }
         
         return result;
@@ -1625,6 +1674,8 @@ public class LayoutUtil
             {
                 JSONObject tmpRows = (JSONObject)rowsObj;
                 String type = tmpRows.getString("type");
+                // 0都不选 1只读 2必填
+                String fieldControl = tmpRows.getJSONObject("field").getString("fieldControl");
                 JSONObject fieldJson = new JSONObject();
                 fieldJson.put("field", tmpRows.getString("name"));
                 fieldJson.put("label", tmpRows.getString("label"));
@@ -1637,6 +1688,14 @@ public class LayoutUtil
                 if (type.equals(Constant.TYPE_SUBFORM))
                 {
                     fieldJson.put("componentList", tmpRows.getJSONArray("componentList"));
+                }
+                if ("1".equals(fieldControl))
+                {
+                    fieldJson.put("editDisable", "1");
+                }
+                else
+                {
+                    fieldJson.put("editDisable", "0");
                 }
                 result.add(fieldJson);
             }
@@ -1666,7 +1725,7 @@ public class LayoutUtil
                 String type = tmpRows.getString("type");
                 if (type.equals(Constant.TYPE_FUNCTIONFORMULA) || type.equals(Constant.TYPE_IDENTIFIER) || type.equals(Constant.TYPE_PICKLIST)
                     || type.equals(Constant.TYPE_MUTLI_PICKLIST) || type.equals(Constant.TYPE_MULTI) || type.equals(Constant.TYPE_PICTURE) || type.equals(Constant.TYPE_ATTACHMENT)
-                    || type.equals(Constant.TYPE_SUBFORM))
+                    || type.equals(Constant.TYPE_SUBFORM) || type.equals(Constant.TYPE_FORMULA) || type.equals(Constant.TYPE_SENIORFORMULA))
                 {
                     continue;
                 }
@@ -1705,7 +1764,8 @@ public class LayoutUtil
                 JSONObject tmpRows = (JSONObject)rowsObj;
                 String rowType = tmpRows.getString("type");
                 String rowName = tmpRows.getString("name");
-                if (rowType.equals(Constant.TYPE_SUBFORM))
+                if (rowType.equals(Constant.TYPE_SUBFORM) || rowType.equals(Constant.TYPE_PICTURE) || rowType.equals(Constant.TYPE_ATTACHMENT)
+                    || rowType.equals(Constant.TYPE_FUNCTIONFORMULA))
                 {
                     continue;
                 }
@@ -1730,8 +1790,8 @@ public class LayoutUtil
                 else
                 {
                     if (rowType.equals(Constant.TYPE_SUBFORM) || rowType.equals(Constant.TYPE_REFERENCE) || rowType.equals(Constant.TYPE_ATTACHMENT)
-                        || rowType.equals(Constant.TYPE_SUBFORM) || rowType.equals(Constant.TYPE_PICTURE) || rowType.equals(Constant.TYPE_FORMULA)
-                        || rowType.equals(Constant.TYPE_SENIORFORMULA) || rowType.equals(Constant.TYPE_FUNCTIONFORMULA) || rowType.equals(Constant.TYPE_IDENTIFIER))
+                        || rowType.equals(Constant.TYPE_PICTURE) || rowType.equals(Constant.TYPE_FORMULA) || rowType.equals(Constant.TYPE_SENIORFORMULA)
+                        || rowType.equals(Constant.TYPE_FUNCTIONFORMULA) || rowType.equals(Constant.TYPE_IDENTIFIER))
                     {
                         continue;
                     }
@@ -1799,9 +1859,9 @@ public class LayoutUtil
                                 JSONObject tmpRow = (JSONObject)tmpRowObj;
                                 String subFieldName = tmpRow.getString("name");
                                 String temType = tmpRow.getString("type");
-                                if (!subFieldName.contains(Constant.TYPE_REFERENCE))
+                                if (!(subFieldName.contains(Constant.TYPE_REFERENCE) || temType.contains(Constant.TYPE_PICTURE) || temType.contains(Constant.TYPE_ATTACHMENT)
+                                    || temType.contains(Constant.TYPE_FUNCTIONFORMULA)))
                                 {
-                                    
                                     JSONObject fieldJson = new JSONObject();
                                     fieldJson.put("field", subFieldName);
                                     fieldJson.put("name", subFieldName);
@@ -1827,16 +1887,19 @@ public class LayoutUtil
                         {
                             JSONObject tmpRow = (JSONObject)tmpRowObj;
                             String temType = tmpRow.getString("type");
-                            JSONObject fieldJson = new JSONObject();
-                            fieldJson.put("field", tmpRows.getString("name"));
-                            fieldJson.put("name", tmpRow.getString("name"));
-                            fieldJson.put("label", tmpRow.getString("label"));
-                            fieldJson.put("type", tmpRow.getString("type"));
-                            if (temType.equals("datetime"))
+                            if (!(temType.contains(Constant.TYPE_PICTURE) || temType.contains(Constant.TYPE_ATTACHMENT) || temType.contains(Constant.TYPE_FUNCTIONFORMULA)))
                             {
-                                fieldJson.put("format", tmpRow.getJSONObject("field").getString("formatType"));
+                                JSONObject fieldJson = new JSONObject();
+                                fieldJson.put("field", tmpRows.getString("name"));
+                                fieldJson.put("name", tmpRow.getString("name"));
+                                fieldJson.put("label", tmpRow.getString("label"));
+                                fieldJson.put("type", tmpRow.getString("type"));
+                                if (temType.equals("datetime"))
+                                {
+                                    fieldJson.put("format", tmpRow.getJSONObject("field").getString("formatType"));
+                                }
+                                resultRow.add(fieldJson);
                             }
-                            resultRow.add(fieldJson);
                         }
                         resultObj.put("label", tmpRows.getString("label"));
                         resultObj.put("name", tmpRows.getString("name"));
@@ -1860,6 +1923,10 @@ public class LayoutUtil
     public static JSONObject getById(String collName, String id)
     {
         Document doc = mongoDB.findById(collName, id);
+        if (doc == null)
+        {
+            return null;
+        }
         return JSONObject.parseObject(doc.toJson());
     }
     
@@ -2007,7 +2074,6 @@ public class LayoutUtil
         {
             Document doc = mcDoc.next();
             JSONObject result = JSONObject.parseObject(doc.toJson());
-            result.remove("_id");
             docs.add(result);
         }
         return docs;
@@ -2569,7 +2635,7 @@ public class LayoutUtil
         queryDoc.append(QueryOperators.AND,
             new BasicDBObject[] {new BasicDBObject("companyId", companyId), new BasicDBObject("pageNum", pageNum == null ? "0" : pageNum),
                 new BasicDBObject("layoutState", Constant.LAYOUT_TYPE_ENABLE), new BasicDBObject("bean", new BasicDBObject(QueryOperators.IN, beanNames.split(",")))});
-                
+        
         MongoCursor<Document> mcDoc = mongoDB.find(Constant.CUSTOMIZED_COLLECTION, queryDoc);
         while (mcDoc.hasNext())
         {// 循环每个模块
@@ -2734,12 +2800,8 @@ public class LayoutUtil
             String fieldName = conditionObj.getString("name");
             if (fieldName.equals("recordNumber"))
             {
-                ybuilder.append(" select count(1) ")
-                    .append(" from ")
-                    .append(DAOUtil.getTableName(bean, companyId))
-                    .append(" where ")
-                    .append(Constant.FIELD_DEL_STATUS)
-                    .append("=0 ");
+                ybuilder.append(" select count(1) ").append(" from ").append(DAOUtil.getTableName(bean, companyId)).append(" where ").append(Constant.FIELD_DEL_STATUS).append(
+                    "=0 ");
             }
             else
             {

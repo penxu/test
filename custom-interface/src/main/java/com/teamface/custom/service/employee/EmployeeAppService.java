@@ -340,4 +340,12 @@ public interface EmployeeAppService
      * @Description:
      */
     public List<JSONObject> queryDepartmentAuthEmployee(String companyId, String employeeId);
+    
+    /**
+     * 项目员工卡片信息
+     * 
+     * @return
+     * @Description:
+     */
+    public JSONObject queryProjectEmployee(String employeeId, String token);
 }

@@ -163,7 +163,7 @@ public class ModuleTeapoolSettingAppServiceImpl implements ModuleTeapoolSettingA
         
         StringBuilder sql = new StringBuilder();
         // 验证是否存在引用公海池的数据
-        sql.append(" select count(1) from ").append(DAOUtil.getTableName(map.get("bean").toString(), companyId)).append(" where seas_pool_id=").append(map.get("id"));
+        sql.append(" select count(1) from ").append(DAOUtil.getTableName(map.get("bean").toString(), companyId)).append(" where del_status=0 and seas_pool_id=").append(map.get("id"));
         int exist = DAOUtil.executeCount(sql.toString());
         if (exist > 0)
         {

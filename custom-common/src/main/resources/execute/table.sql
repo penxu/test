@@ -384,7 +384,7 @@ upload_status char(1) DEFAULT 0,
 upload_describe varchar(1024),
 del_status char(1) DEFAULT 0,
 by_status char(1) DEFAULT 0,
-download_number  int8 DEFAULT 0,
+download_number  int8,
 create_by int4,
 create_time int8,
 modify_by  int4,
@@ -481,7 +481,6 @@ create_time int8,
 icon_type    char(1),
 icon_color  text,
 icon_url   text,
-edition    char(1),
 CONSTRAINT application_template_module_pkey PRIMARY KEY (id)
 );
 
@@ -499,7 +498,7 @@ COMMENT ON COLUMN application_template_module.create_time IS '创建时间';
 COMMENT ON COLUMN application_template_module.icon_type IS '类型';
 COMMENT ON COLUMN application_template_module.icon_color IS '颜色';
 COMMENT ON COLUMN application_template_module.icon_url IS '路径';
-COMMENT ON COLUMN application_template_module.edition IS '版本';
+
 
 CREATE TABLE application_template_module_menu (
 id serial NOT NULL,
@@ -734,47 +733,6 @@ COMMENT ON COLUMN application_template_auto_color.create_time IS '创建时间';
 
 
 
-
-
-CREATE TABLE company_safe (
-id serial NOT NULL,
-company_id int4,
-pwd_term int2,
-pwd_length   int2,
-pwd_complex  int2,
-pwd_phone int4,
-pwd_lock  int4,
-link_set  int2 DEFAULT 0, 
-del_status char(1) DEFAULT 0,
-create_by int4,
-create_time  int8,
-CONSTRAINT "company_safe_pkey" PRIMARY KEY ("id")
-)
-;
-
-COMMENT ON TABLE "public"."company_safe" IS '应用模板评论表';
-
-COMMENT ON COLUMN "public"."company_safe"."company_id" IS '公司ID';
-
-COMMENT ON COLUMN "public"."company_safe"."pwd_term" IS '密码有效期(0 无限制  1 30 天  2 60 天 3 90 天 4 一年 )';
-
-COMMENT ON COLUMN "public"."company_safe"."pwd_length" IS '密码长度';
-
-COMMENT ON COLUMN "public"."company_safe"."pwd_complex" IS '密码复杂性 0 无限制 1 包含字母.数字 2 包含字母.数字 特殊字符 3 包含数字 大小写字母 4 包含数字 大小写字母 特殊字符';
-
-COMMENT ON COLUMN "public"."company_safe"."pwd_phone" IS '错误次数 手机验证';
-
-COMMENT ON COLUMN "public"."company_safe"."pwd_lock" IS '错误次数 账户锁定';
-
-COMMENT ON COLUMN "public"."company_safe"."link_set" IS '会话时长 0无限制 1 30分钟 2 1小时 2 3小时 3 一天 4 7天';
-
-COMMENT ON COLUMN "public"."company_safe"."del_status" IS '是否删除（0,正常 1 删除）';
-
-COMMENT ON COLUMN "public"."company_safe"."create_by" IS '创建人';  
-
-COMMENT ON COLUMN "public"."company_safe"."create_time" IS '创建时间';
-
-
 CREATE TABLE application_template_auto_color_detail (
 id serial NOT NULL,
 template_auto_color_id int4 NOT NULL,
@@ -874,7 +832,6 @@ quantity  int4,
 end_time int8,
 status   char(1) DEFAULT '0'::bpchar,
 del_status   char(1) DEFAULT '0'::bpchar,
-invite_type char(1),
 CONSTRAINT invite_pkey PRIMARY KEY (id)
 )
 ;
@@ -892,7 +849,7 @@ COMMENT ON COLUMN invite.status IS '状态 0:未使用  1:已使用';
 
 COMMENT ON COLUMN invite.del_status IS '状态 0:正常  1:删除';
 
-COMMENT ON COLUMN invite.invite_type IS '状态 0:多个 1:重复';
+
 
 
 CREATE TABLE register_user (
@@ -1018,7 +975,6 @@ CREATE TABLE "public"."center_role" (
 "name" varchar(100),
 "status" char(1) DEFAULT 0,
 "remark" varchar(255),
-"sys_type"  char(1) DEFAULT 0,
 CONSTRAINT "center_role_pkey" PRIMARY KEY ("id")
 )
 ;
@@ -1032,7 +988,7 @@ COMMENT ON COLUMN "public"."center_role"."status" IS '状态 0:正常 1:删除';
 
 COMMENT ON COLUMN "public"."center_role"."remark" IS '角色描述';
 
-COMMENT ON COLUMN "public"."center_role"."sys_type" IS '类型   0  添加  1 系统';
+
 
 
 
@@ -1153,7 +1109,7 @@ COMMENT ON COLUMN "public"."center_operation_record"."account_id" IS '操作人'
 
 
 
-INSERT into center_role(name,remark,sys_type) VALUES('系统管理员','系统管理员','1');
+INSERT into center_role(name,remark) VALUES('系统管理员','系统管理员');
 
 insert into center_module(name) VALUES('注册客户');
 insert into center_module(name) VALUES('试用客户');

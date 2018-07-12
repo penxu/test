@@ -20,6 +20,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.teamface.common.cache.ServiceResultCodeCache;
 import com.teamface.common.constant.Constant;
 import com.teamface.common.model.ServiceResult;
+import com.teamface.common.util.StringUtil;
 import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.common.util.dao.JSONParser4SQL;
 import com.teamface.common.util.dao.JedisClusterHelper;
@@ -663,11 +664,11 @@ public class ModuleAppServiceImpl implements ModuleAppService
      * 获取规则筛选的初始化数据
      */
     @Override
-    public JSONArray queryInitData(String token, String bean)
+    public JSONArray queryInitData(String token, String bean, String dynamicFlag)
         throws Exception
     {
         InfoVo info = TokenMgr.obtainInfo(token);
-        JSONArray array = JSONParser4SQL.getFilterInitData(info.getCompanyId().toString(), bean, false);
+        JSONArray array = JSONParser4SQL.getFilterInitData(info.getCompanyId().toString(), bean, (!StringUtil.isEmpty(dynamicFlag) && dynamicFlag.equals("1")) ? true : false);
         return array;
         
     }
@@ -730,13 +731,13 @@ public class ModuleAppServiceImpl implements ModuleAppService
         jsonObject.put("myApplication", jsonList);
         // 获取常见应用
         StringBuilder querybuilder = new StringBuilder();
-        querybuilder.append("select module_id id,chinese_name,english_name,icon_type,icon_color,icon_url  from ")
+        querybuilder.append("select  id orderId ,module_id id,chinese_name,english_name,icon_type,icon_color,icon_url  from ")
             .append(usedTable)
             .append(" where  del_status = ")
             .append(Constant.CURRENCY_ZERO)
             .append(" and employee_id=")
             .append(info.getEmployeeId())
-            .append(" order by id asc ");
+            .append(" order by orderId asc ");
         List<JSONObject> list = DAOUtil.executeQuery4JSON(querybuilder.toString());
         jsonObject.put("commonApplication", list);
         return jsonObject;

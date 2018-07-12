@@ -35,10 +35,10 @@ import com.teamface.common.constant.Constant;
 import com.teamface.common.constant.RedisKey4Function;
 import com.teamface.common.model.ServiceResult;
 import com.teamface.common.mq.RabbitMQServer;
-import com.teamface.common.util.JobManager;
 import com.teamface.common.util.StringUtil;
 import com.teamface.common.util.activiti.ActivitiUtil;
 import com.teamface.common.util.activiti.ActivitiUtil.AutoTask;
+import com.teamface.common.util.activiti.AssigneeServer;
 import com.teamface.common.util.dao.BusinessDAOUtil;
 import com.teamface.common.util.dao.DAOUtil;
 import com.teamface.common.util.dao.JSONParser4SQL;
@@ -46,8 +46,15 @@ import com.teamface.common.util.dao.JedisClusterHelper;
 import com.teamface.common.util.dao.LayoutUtil;
 import com.teamface.common.util.jwt.InfoVo;
 import com.teamface.common.util.jwt.TokenMgr;
-import com.teamface.custom.async.ApprovalAsyncHandle;
-import com.teamface.custom.service.Thread.FirstThread;
+import com.teamface.custom.async.AsyncHandle;
+import com.teamface.custom.async.thread.approval.CcTo;
+import com.teamface.custom.async.thread.approval.ModifyBusinessData;
+import com.teamface.custom.async.thread.approval.ModifyProcessApproval;
+import com.teamface.custom.async.thread.approval.ModifyPushMessageContent;
+import com.teamface.custom.async.thread.approval.SaveEmailApprovalWhere;
+import com.teamface.custom.async.thread.approval.SaveProcessApproval;
+import com.teamface.custom.async.thread.approval.SaveToDraft;
+import com.teamface.custom.async.thread.approval.SendMail;
 import com.teamface.custom.service.employee.EmployeeAppService;
 import com.teamface.custom.service.push.MessagePushService;
 
@@ -152,7 +159,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             List<JSONObject> fieldAuthList = new ArrayList<JSONObject>();
             // 有分支条件的节点
             JSONObject whereTaskNode = new JSONObject();
-            if (processType.equals("0"))
+            if ("0".equals(processType))
             {// 固定流程
                 JSONArray nodeArr = attrJson.getJSONArray("taskList");
                 ListIterator<Object> nodeIterator = nodeArr.listIterator();
@@ -242,7 +249,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     taskParams.put("ccType", tmpTask.getString("ccType"));// 抄送方式（0审批通过抄送，1审批驳回抄送）
                     
                     // 将当前任务节点放入节点集合
-                    if (!taskType.equals("end"))
+                    if (!"end".equals(taskType))
                     {
                         taskList.add(taskParams);
                     }
@@ -276,7 +283,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     batchValList.add(batchVal.toArray());
                     
                     // 保存节点字段权限
-                    if (!moduleBean.equals("bean_mail"))
+                    if (!"bean_mail".equals(moduleBean))
                     {// 邮件流程无字段权限
                         JSONObject fieldAuthJson = new JSONObject();
                         fieldAuthJson.put("taskKey", taskKey);
@@ -297,7 +304,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 this.saveNodeAttributeForBatch(batchValList, companyId);
                 
                 // 保存任务节点字段版本布局
-                if (!moduleBean.equals("bean_mail"))
+                if (!"bean_mail".equals(moduleBean))
                 {// 邮件流程无字段权限
                     this.saveNodeFieldAuthLayout(moduleBean, companyId.toString(), processAttributeId, fieldAuthList);
                 }
@@ -340,7 +347,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             Process process = ActivitiUtil.getProcess(processKey, processName);
             
             // 创建自定义节点
-            process = this.createTaskNode(processType, process, taskList);
+            process = this.createTaskNode(processType, process, taskList, companyId);
             
             // 创建节点连接线
             String currentBeanTable = DAOUtil.getTableName(moduleBean + "_approval", companyId);
@@ -401,6 +408,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getWorkflowLayout(String moduleBean, String token)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", moduleBean, token));
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
         
@@ -410,10 +418,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         JSONObject workflowProcessLayout = LayoutUtil.findDoc(queryDoc, Constant.WORKFLOW_COLLECTION);
         if (null == workflowProcessLayout)
         {
+            log.debug("end !");
             return null;
         }
         if (workflowProcessLayout.getString("moduleBean").equals(Constant.PROCESS_MAIL_BEAN))
         {
+            log.debug("end !");
             return workflowProcessLayout;
         }
         
@@ -446,6 +456,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             }
             workflowProcessLayout.put("taskList", modifyOldTaskArr);
         }
+        log.debug("end !");
         return workflowProcessLayout;
     }
     
@@ -458,7 +469,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> removeWorkflowLayout(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         try
@@ -502,8 +513,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         log.debug(String.format("start ! parameters{%s,%s} ", saveJson, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
-        ApprovalAsyncHandle approvalHandle3 = new ApprovalAsyncHandle(token, saveJson);
-        approvalHandle3.asyncSaveProcessApproval();
+        
+        AsyncHandle asyncHandle = new AsyncHandle();
+        SaveProcessApproval spa = new SaveProcessApproval(token, saveJson);
+        spa.setName("SaveProcessApproval-Thread");
+        asyncHandle.commitJob(spa);
+        
         log.debug("end !");
         return serviceResult;
     }
@@ -518,7 +533,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> removeProcessApproval(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         try
@@ -571,7 +586,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> pass(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         try
@@ -611,17 +626,25 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             String imAprId = reqJson.getString("imAprId");
             // 审批小助手参数
             String paramFields = reqJson.getString("paramFields");
-            if (!StringUtil.isEmpty(imAprId) && !StringUtil.isEmpty(paramFields))
+            if (StringUtil.isEmpty(paramFields))
             {
-                JSONObject paramFieldsJson = JSONObject.parseObject(paramFields);
-                paramFieldsJson.put("fromType", "2");
-                // 修改审批推送内容
-                JSONObject taskJSON = new JSONObject();
-                taskJSON.put("imAprId", imAprId);
-                taskJSON.put("paramFields", paramFieldsJson.toString());
-                ApprovalAsyncHandle approvalHandle = new ApprovalAsyncHandle(token, taskJSON);
-                approvalHandle.modifyPushMessageContent();
+                JSONObject paramFieldsJSON = new JSONObject();
+                paramFieldsJSON.put("dataId", Long.parseLong(dataId));
+                paramFieldsJSON.put("fromType", "1");
+                paramFieldsJSON.put("moduleBean", moduleBean);
+                paramFields = paramFieldsJSON.toJSONString();
             }
+            JSONObject paramFieldsJson = JSONObject.parseObject(paramFields);
+            paramFieldsJson.put("fromType", "2");
+            // 修改审批推送内容
+            JSONObject taskJSON = new JSONObject();
+            taskJSON.put("imAprId", imAprId);
+            taskJSON.put("paramFieldsWhere", paramFields);
+            taskJSON.put("paramFieldsValue", paramFieldsJson.toString());
+            AsyncHandle asyncHandle = new AsyncHandle();
+            ModifyPushMessageContent mpmc = new ModifyPushMessageContent(token, taskJSON);
+            mpmc.setName("ModifyPushMessageContent-Thread");
+            asyncHandle.commitJob(mpmc);
             
             // 修改审批申请表数据
             this.modifyBusinessData(moduleBean.concat("_approval"), companyId, Long.valueOf(dataId), modifyDataObj);
@@ -660,24 +683,27 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 }
                 long autoAssignee = autoTask.assignee;
                 autoTask = ActivitiUtil.completeTask(companyId, processInstanceId, autoTaskId, autoTaskKey, "", "自动审批通过", employeeId, autoNextAssignee);
-                // 保存操作记录
-                JSONObject saveJsonAuto = new JSONObject();
-                JSONObject paramsJsonAuto = new JSONObject();
-                saveJsonAuto.put("process_definition_id", processInstanceId);
-                saveJsonAuto.put("task_id", autoTaskId);
-                saveJsonAuto.put("task_key", autoTaskKey);
-                saveJsonAuto.put("task_name", autoTaskName);
-                saveJsonAuto.put("task_status_id", Constant.PROCESS_STATUS_FINISH);
-                saveJsonAuto.put("task_status_name", "审批通过");
-                saveJsonAuto.put("approval_employee_id", autoAssignee);
-                saveJsonAuto.put("approval_message", "");// 自动审批通过
-                paramsJsonAuto.put("type", Constant.PROCESS_STATUS_FINISH);
-                paramsJsonAuto.put("nextAssignee", autoNextAssignee);
-                paramsJsonAuto.put("token", token);
-                paramsJsonAuto.put("dataId", dataId);
-                paramsJsonAuto.put("moduleBean", moduleBean);
-                paramsJsonAuto.put("taskKey", autoTaskKey);
-                this.saveApprovedTask(saveJsonAuto, paramsJsonAuto);
+                if (autoTask.auto)
+                {
+                    // 保存操作记录
+                    JSONObject saveJsonAuto = new JSONObject();
+                    JSONObject paramsJsonAuto = new JSONObject();
+                    saveJsonAuto.put("process_definition_id", processInstanceId);
+                    saveJsonAuto.put("task_id", autoTaskId);
+                    saveJsonAuto.put("task_key", autoTaskKey);
+                    saveJsonAuto.put("task_name", autoTaskName);
+                    saveJsonAuto.put("task_status_id", Constant.PROCESS_STATUS_FINISH);
+                    saveJsonAuto.put("task_status_name", "审批通过");
+                    saveJsonAuto.put("approval_employee_id", autoAssignee);
+                    saveJsonAuto.put("approval_message", "");// 自动审批通过
+                    paramsJsonAuto.put("type", Constant.PROCESS_STATUS_FINISH);
+                    paramsJsonAuto.put("nextAssignee", autoNextAssignee);
+                    paramsJsonAuto.put("token", token);
+                    paramsJsonAuto.put("dataId", dataId);
+                    paramsJsonAuto.put("moduleBean", moduleBean);
+                    paramsJsonAuto.put("taskKey", autoTaskKey);
+                    this.saveApprovedTask(saveJsonAuto, paramsJsonAuto);
+                }
             }
         }
         catch (Exception e)
@@ -698,7 +724,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> reject(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -770,9 +796,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 // 修改审批推送内容
                 JSONObject taskJSON = new JSONObject();
                 taskJSON.put("imAprId", imAprId);
-                taskJSON.put("paramFields", paramFieldsJson.toString());
-                ApprovalAsyncHandle approvalHandle = new ApprovalAsyncHandle(token, taskJSON);
-                approvalHandle.modifyPushMessageContent();
+                taskJSON.put("paramFieldsWhere", paramFields);
+                taskJSON.put("paramFieldsValue", paramFieldsJson.toString());
+                AsyncHandle asyncHandle = new AsyncHandle();
+                ModifyPushMessageContent mpmc = new ModifyPushMessageContent(token, taskJSON);
+                mpmc.setName("ModifyPushMessageContent-Thread");
+                asyncHandle.commitJob(mpmc);
             }
             
             StringBuilder getKey = new StringBuilder();
@@ -863,7 +892,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> transfer(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -909,9 +938,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 // 修改审批推送内容
                 JSONObject taskJSON = new JSONObject();
                 taskJSON.put("imAprId", imAprId);
-                taskJSON.put("paramFields", paramFieldsJson.toString());
-                ApprovalAsyncHandle approvalHandle = new ApprovalAsyncHandle(token, taskJSON);
-                approvalHandle.modifyPushMessageContent();
+                taskJSON.put("paramFieldsWhere", paramFields);
+                taskJSON.put("paramFieldsValue", paramFieldsJson.toString());
+                AsyncHandle asyncHandle = new AsyncHandle();
+                ModifyPushMessageContent mpmc = new ModifyPushMessageContent(token, taskJSON);
+                mpmc.setName("ModifyPushMessageContent-Thread");
+                asyncHandle.commitJob(mpmc);
             }
             
             log.debug(processInstanceId + "." + currentTaskId + "审批转交");
@@ -996,7 +1028,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> revoke(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1059,8 +1091,10 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 JSONObject async = new JSONObject();
                 async.put("querySql", querySql.toString());
                 async.put("approvalStatus", Constant.PROCESS_STATUS_REVOKE);
-                ApprovalAsyncHandle approvalHandle4 = new ApprovalAsyncHandle(token, async);
-                approvalHandle4.asyncSaveToDraft();
+                AsyncHandle asyncHandle = new AsyncHandle();
+                SaveToDraft std = new SaveToDraft(token, async);
+                std.setName("SaveToDraft-Thread");
+                asyncHandle.commitJob(std);
             }
         }
         catch (Exception e)
@@ -1081,12 +1115,14 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> ccTo(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
-        ApprovalAsyncHandle approvalHandle5 = new ApprovalAsyncHandle(token, JSONObject.parseObject(reqJsonStr));
-        approvalHandle5.asyncCcTo();
+        AsyncHandle asyncHandle = new AsyncHandle();
+        CcTo ct = new CcTo(token, JSONObject.parseObject(reqJsonStr));
+        ct.setName("CcTo-Thread");
+        asyncHandle.commitJob(ct);
         log.debug("end! ");
         return serviceResult;
     }
@@ -1100,7 +1136,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> urgeTo(String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1148,7 +1184,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             approvalOper.add(approvalOperJson);
             msgs.put("field_info", approvalOper);
             JSONObject paramFieldsJSON = new JSONObject();
-            paramFieldsJSON.put("dataId", dataId);
+            paramFieldsJSON.put("dataId", Long.parseLong(dataId));
             paramFieldsJSON.put("fromType", "1");
             paramFieldsJSON.put("moduleBean", moduleBean);
             msgs.put("param_fields", paramFieldsJSON);
@@ -1181,7 +1217,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getProcessAttributeByBean(String moduleBean, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", moduleBean, token));
         JSONObject result = null;
         try
         {
@@ -1215,7 +1251,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getProcessAttributeByBeanForCreate(String moduleBean, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", moduleBean, token));
         JSONObject result = null;
         try
         {
@@ -1241,6 +1277,47 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     }
     
     /**
+     * @param moduleBean
+     * @param token
+     * @return JSONObject
+     * @Description:根据bean获取流程属性信息(修改用)
+     */
+    @Override
+    public JSONObject getProcessAttributeByBeanForUpdate(String dataId, String moduleBean, String token)
+    {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", dataId, moduleBean, token));
+        JSONObject result = null;
+        try
+        {
+            // 解析token
+            InfoVo info = TokenMgr.obtainInfo(token);
+            Long companyId = info.getCompanyId();
+            
+            String attributeTable = DAOUtil.getTableName("process_attribute", companyId);
+            String approvalTable = DAOUtil.getTableName("process_approval", companyId);
+            StringBuilder querySql = new StringBuilder();
+            querySql.append("select * from ");
+            querySql.append(attributeTable);
+            querySql.append(" where process_key in(select process_key from ");
+            querySql.append(approvalTable);
+            querySql.append(" where module_bean='");
+            querySql.append(moduleBean);
+            querySql.append("' and approval_data_id = ");
+            querySql.append(dataId);
+            querySql.append(" limit 1)");// and del_status=0 and
+                                         // save_start_status=1 and
+                                         // v_use_status=1
+            result = DAOUtil.executeQuery4FirstJSON(querySql.toString());
+        }
+        catch (Exception e)
+        {
+            log.error(e.getMessage(), e);
+        }
+        log.debug("end !");
+        return result;
+    }
+    
+    /**
      * @param taskKey
      * @param moduleBean
      * @param token
@@ -1250,7 +1327,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getProcessAttributeByBeanForDetail(Object taskKey, String moduleBean, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", taskKey, moduleBean, token));
         JSONObject result = null;
         try
         {
@@ -1290,7 +1367,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getProcessAttributeByVersion(String moduleBean, Long dataId, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", moduleBean, dataId, token));
         JSONObject result = null;
         try
         {
@@ -1328,19 +1405,20 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      * @Description:更新流程实例id
      */
     @Override
-    public boolean modifyProcessInstanceId(String processInstanceId, Long processId, Long companyId)
+    public boolean modifyProcessInfo(Long companyId, String moduleBean, String moduleName)
     {
-        log.debug(String.format("start ! parameters{%s,%s,%s} ", processInstanceId, processId, companyId));
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", companyId, moduleBean, moduleName));
         try
         {
             String processTable = DAOUtil.getTableName("process_attribute", companyId);
             StringBuilder modifySql = new StringBuilder();
             modifySql.append("update ").append(processTable);
-            modifySql.append(" set process_instance_id = '").append(processInstanceId).append("'");
-            modifySql.append(" where id = ").append(processId);
+            modifySql.append(" set process_name = '").append(moduleName).append("'");
+            modifySql.append(" where module_bean = '").append(moduleBean).append("' and del_status=0 and save_start_status=1 and v_use_status=1");
             int modifyResult = DAOUtil.executeUpdate(modifySql.toString());
             if (modifyResult < 1)
             {
+                log.debug("end !");
                 return false;
             }
         }
@@ -1361,7 +1439,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> modifyTaskNodeAttribute(String processKey, String reqJsonStr, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processKey, reqJsonStr, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1380,11 +1458,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             if (jsonMap.size() == 0)
             {
                 serviceResult.setCodeMsg(resultCode.get("common.fail"), resultCode.getMsgZh("common.fail"));
+                log.debug("end !");
                 return serviceResult;
             }
             for (Map.Entry<String, String> entry : jsonMap.entrySet())
             {
-                setValus.append(entry.getKey()).append(" = '").append(entry.getValue()).append("', ");
+                setValus.append(entry.getKey()).append(" = '").append(entry.getValue().replace("'", "''")).append("', ");
             }
             modifySql.append(setValus.substring(0, setValus.length() - 2)).append(" where process_key = '").append(processKey).append("'");
             DAOUtil.executeUpdate(modifySql.toString());
@@ -1408,7 +1487,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> modifyProcessApproval(String moduleBean, Long dataId, String reqJsonStr, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", moduleBean, dataId, reqJsonStr, companyId));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1417,8 +1496,11 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         modifyJSON.put("companyId", companyId);
         modifyJSON.put("dataId", dataId);
         modifyJSON.put("reqJsonStr", reqJsonStr);
-        ApprovalAsyncHandle approvalHandle6 = new ApprovalAsyncHandle(null, modifyJSON);
-        approvalHandle6.asyncModifyProcessApproval();
+        
+        AsyncHandle asyncHandle = new AsyncHandle();
+        ModifyProcessApproval mpa = new ModifyProcessApproval(modifyJSON);
+        mpa.setName("CcTo-Thread");
+        asyncHandle.commitJob(mpa);
         
         log.debug("end !");
         return serviceResult;
@@ -1433,7 +1515,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getTaskNodeAttributeByPid(Long processId, String taskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processId, taskKey, token));
         JSONObject result = null;
         try
         {
@@ -1466,7 +1548,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getNextTaskNodeAttributeByPid(String processId, String taskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processId, taskKey, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1520,7 +1602,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getNextTaskNodeAttributeByBean(String moduleBean, String currentTaskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", moduleBean, currentTaskKey, token));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         
@@ -1576,6 +1658,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public String getNextTaskAssigne(Map<String, String> paramsMap)
     {
+        log.debug(String.format("start ! parameters{%s} ", paramsMap));
         // 请求参数
         String token = paramsMap.get("token");
         String processInstanceId = paramsMap.get("processInstanceId");
@@ -1645,6 +1728,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
          * String[] appverArrStr = approverSB.toString().split(","); Long[]
          * assigneArr = (Long[])ConvertUtils.convert(appverArrStr, Long.class);
          */
+        log.debug("end !");
         return approverSB.toString();
     }
     
@@ -1870,7 +1954,20 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                             log.info("流程[" + processName + "|" + processInstanceId + "]已审批通过,并成功提醒:" + beginJson.getLong("id"));
                         }
                         
+                        Integer approverDuplicate = processJson.getInteger("approver_duplicate");
+                        boolean pushSelf = false;
                         // 推送-通知：下一节点审批人（如下一审批为多人审批，则推多人）
+                        Long[] receiverIds = new Long[tasks.size()];
+                        for (int i = 0; i < tasks.size(); i++)
+                        {
+                            if (employeeId == Long.parseLong(tasks.get(i).getAssignee()))
+                            {
+                                pushSelf = true;
+                                continue;
+                            }
+                            receiverIds[i] = Long.parseLong(tasks.get(i).getAssignee());
+                        }
+                        
                         JSONObject msgs = new JSONObject();
                         msgs.put("push_content", "审批：" + beginJson.getString("employee_name") + "的" + processName + "。");
                         msgs.put("bean_name", moduleBean);
@@ -1881,17 +1978,24 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         approvalOperJson.put("field_value", "");
                         approvalOper.add(approvalOperJson);
                         msgs.put("field_info", approvalOper);
-                        JSONObject paramFieldsJSON = new JSONObject();
-                        paramFieldsJSON.put("dataId", dataId);
-                        paramFieldsJSON.put("fromType", "1");
-                        paramFieldsJSON.put("moduleBean", moduleBean);
-                        msgs.put("param_fields", paramFieldsJSON);
-                        Long[] receiverIds = new Long[tasks.size()];
-                        for (int i = 0; i < tasks.size(); i++)
+                        if (pushSelf)
                         {
-                            receiverIds[i] = Long.parseLong(tasks.get(i).getAssignee());
+                            JSONObject paramFieldsJSON = new JSONObject();
+                            paramFieldsJSON.put("dataId", dataId);
+                            paramFieldsJSON.put("fromType", approverDuplicate == 1 ? "2" : "1");
+                            paramFieldsJSON.put("moduleBean", moduleBean);
+                            msgs.put("param_fields", paramFieldsJSON);
+                            messagePushService.pushApprovalMessage(token, msgs, new Long[] {employeeId});
                         }
-                        messagePushService.pushApprovalMessage(token, msgs, receiverIds);
+                        if (receiverIds.length > 0)
+                        {
+                            JSONObject paramFieldsJSON = new JSONObject();
+                            paramFieldsJSON.put("dataId", dataId);
+                            paramFieldsJSON.put("fromType", "1");
+                            paramFieldsJSON.put("moduleBean", moduleBean);
+                            msgs.put("param_fields", paramFieldsJSON);
+                            messagePushService.pushApprovalMessage(token, msgs, receiverIds);
+                        }
                     }
                     else if (type.equals(Constant.PROCESS_STATUS_REJECT))
                     {// 驳回
@@ -2109,7 +2213,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 }
             }
             else if (null != nextTaskJSON && !nextTaskJSON.getString("task_key").equals(Constant.PROCESS_FIELD_TASK_END) && !type.equals(Constant.PROCESS_STATUS_REVOKE)
-                && !type.equals(Constant.PROCESS_STATUS_REJECT))
+                && !type.equals(Constant.PROCESS_STATUS_REJECT) && !type.equals(Constant.PROCESS_STATUS_FINISH))
             {// 流程中，找不到审批人
                 saveJson.put("next_task_key", null);
                 saveJson.put("next_task_name", null);
@@ -2167,10 +2271,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                             querySql.append(" t2 on t1.mail_id = t2.id where t1.id = " + dataId);
                             JSONObject asyncJson = new JSONObject();
                             asyncJson.put("querySql", querySql.toString());
-                            asyncJson.put("approvalStatus", Constant.PROCESS_STATUS_FINISH);
+                            asyncJson.put("approvalStatus", Constant.PROCESS_STATUS_REJECT);
                             asyncJson.put("processInstanceId", processInstanceId);
-                            ApprovalAsyncHandle handle2 = new ApprovalAsyncHandle(token, asyncJson);
-                            handle2.asyncSaveToDraft();
+                            AsyncHandle asyncHandle = new AsyncHandle();
+                            SaveToDraft std = new SaveToDraft(token, asyncJson);
+                            std.setName("SaveToDraft-Thread");
+                            asyncHandle.commitJob(std);
                         }
                         
                     }
@@ -2322,18 +2428,23 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         asyncJson.put("querySql", querySql.toString());
                         asyncJson.put("approvalStatus", Constant.PROCESS_STATUS_FINISH);
                         asyncJson.put("processInstanceId", processInstanceId);
-                        ApprovalAsyncHandle handle2 = new ApprovalAsyncHandle(token, asyncJson);
-                        
                         // 通过方式: 0 存在草稿箱,由发件人手动发送 1 直接发送给客户
                         String passWay = processJson.getString("mail_pass_way");
-                        if (passWay.equals("0"))
-                        {// 邮件存草稿
-                            System.err.println("流程审批通过且通过方式为存草稿时，调用存草稿接口");
-                            handle2.asyncSaveToDraft();
+                        if ("0".equals(passWay))
+                        {
+                            System.err.println("流程审批通过且通过方式为邮件存草稿时，调用邮件存草稿接口");
+                            AsyncHandle asyncHandle = new AsyncHandle();
+                            SaveToDraft std = new SaveToDraft(token, asyncJson);
+                            std.setName("SaveToDraft-Thread");
+                            asyncHandle.commitJob(std);
                         }
                         else
-                        {// 发送邮件
-                            handle2.asyncSendMail();
+                        {
+                            System.err.println("流程审批通过且通过方式为发送时，调用发送邮件接口");
+                            AsyncHandle asyncHandle = new AsyncHandle();
+                            SendMail sm = new SendMail(token, asyncJson);
+                            sm.setName("SendMail-Thread");
+                            asyncHandle.commitJob(sm);
                         }
                     }
                 }
@@ -2344,34 +2455,6 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             log.error(e.getMessage(), e);
             e.printStackTrace();
         }
-        return serviceResult;
-    }
-    
-    /**
-     * @param saveJson
-     * @param paramsJson
-     * @return
-     * @Description:保存流程已审批任务节点(未调用，保留)
-     */
-    @Override
-    public ServiceResult<String> moduleForProcessEntryHandle(JSONObject saveJson, JSONObject paramsJson)
-    {
-        log.debug(String.format("start ! parameters{%s,%s} ", saveJson, paramsJson));
-        ServiceResult<String> serviceResult = new ServiceResult<String>();
-        serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
-        
-        // 解析token
-        InfoVo info = TokenMgr.obtainInfo(paramsJson.getString("token"));
-        Long companyId = info.getCompanyId();
-        Long employeeId = info.getEmployeeId();
-        
-        JSONObject reqSaveJSON_TASK = new JSONObject();
-        reqSaveJSON_TASK.put("saveJson1", saveJson);
-        reqSaveJSON_TASK.put("paramsJson1", paramsJson);
-        JedisClusterHelper.set("reqSaveJSON_TASK_" + companyId + "_" + employeeId, reqSaveJSON_TASK);
-        ApprovalAsyncHandle approvaTasklHandle = new ApprovalAsyncHandle(paramsJson.getString("token"), reqSaveJSON_TASK);
-        approvaTasklHandle.asyncSaveApprovedTask();
-        
         log.debug("end !");
         return serviceResult;
     }
@@ -2385,7 +2468,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> getProcessWholeFlow(Map<String, Object> params)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s} ", params));
         // 获取已审批任务
         List<JSONObject> approvedTasks = null;
         try
@@ -2415,6 +2498,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             approvedTasks = getApprovalFinshedTask(processInstanceId, processType, companyId);
             if (null == approvedTasks || approvedTasks.size() == 0)
             {
+                log.debug("end !");
                 return new ArrayList<JSONObject>();
             }
             else if (processAttribute.getIntValue("owner_invisible") == 1)
@@ -2422,6 +2506,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 JSONObject processApproval = this.getProcessApproval(companyId, processInstanceId, dataId);// 获取发起人
                 if (processApproval.getLongValue("begin_user_id") == employeeId)
                 {
+                    log.debug("end !");
                     return new ArrayList<JSONObject>();
                 }
             }
@@ -2433,6 +2518,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             String nextApprovalEmployeeId = queryLastTask.getString("next_approval_employee_id");
             if (lastTaskKey.equals(Constant.PROCESS_FIELD_TASK_END))
             {
+                log.debug("end !");
                 return approvedTasks;
             }
             
@@ -2453,7 +2539,6 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     nextTaskDefJson.put("approval_employee_post", null);
                     nextTaskDefJson.put("approval_employee_picture", null);
                     approvedTasks.add(nextTaskDefJson);
-                    
                     // 结束流程节点
                     JSONObject endTaskJson = new JSONObject();
                     endTaskJson.put("process_definition_id", processInstanceId);
@@ -2486,10 +2571,55 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         nextTaskJson.put("approval_message", "等待重新提交...");
                         approvedTasks.add(nextTaskJson);
                     }
-                    else if (approverType.equals("0") || approverType.equals("2") || approverType.equals("5"))
+                    else if (approverType.equals("0") || approverType.equals("5"))
                     {// 单人审批
                         JSONObject empInfo = this.queryAssigneeName(nextApprovalEmployeeId, companyId);
                         
+                        long days = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - queryLastTask.getLongValue("approval_time"));
+                        JSONObject nextTaskJson = new JSONObject();
+                        nextTaskJson.put("process_definition_id", processInstanceId);
+                        nextTaskJson.put("process_type", processType);
+                        nextTaskJson.put("task_key", nextTaskKey);
+                        nextTaskJson.put("task_name", nextTaskName);
+                        nextTaskJson.put("task_status_id", Constant.PROCESS_STATUS_ING);
+                        nextTaskJson.put("normal", empInfo.isEmpty() ? "0" : "1");
+                        nextTaskJson.put("task_status_name", empInfo.isEmpty() ? "异常" : days == 0 ? "审批中" : "已等待" + days + "天");
+                        nextTaskJson.put("approval_employee_id", nextApprovalEmployeeId);
+                        nextTaskJson.put("approval_employee_name", empInfo.isEmpty() ? "未找到合适的审批人" : empInfo.getString("employee_name"));
+                        nextTaskJson.put("approval_employee_post", empInfo.getString("post_name"));
+                        nextTaskJson.put("approval_employee_picture", empInfo.getString("picture"));
+                        if (!empInfo.isEmpty())
+                        {
+                            nextTaskJson.put("approval_message", "正在审批中...");
+                        }
+                        approvedTasks.add(nextTaskJson);
+                    }
+                    else if (approverType.equals("2"))
+                    {// 部门负责人-单级
+                        StringBuilder beginUserKey = new StringBuilder();
+                        beginUserKey.append(companyId);
+                        beginUserKey.append("_");
+                        beginUserKey.append(processInstanceId);
+                        beginUserKey.append("_");
+                        beginUserKey.append(RedisKey4Function.PROCESS_BEGIN_USER.getIndex());
+                        Object object = JedisClusterHelper.get(beginUserKey.toString());
+                        JSONObject beginJson = null;
+                        if (null == object)
+                        {
+                            beginJson = getBeginUserInfo(processInstanceId, companyId);
+                        }
+                        else
+                        {
+                            beginJson = (JSONObject)object;
+                        }
+                        int approvalSupplement = lastTaskAttribute.getIntValue("approval_supplement");
+                        if (1 == approvalSupplement)
+                        {
+                            Integer level = lastTaskAttribute.getInteger("approval_department_single");
+                            AssigneeServer assigneeServer = new AssigneeServer();
+                            nextApprovalEmployeeId = assigneeServer.getDeparmentPrincipal(companyId.toString(), beginJson.getString("id"), level + 1, true);
+                        }
+                        JSONObject empInfo = this.queryAssigneeName(nextApprovalEmployeeId, companyId);
                         long days = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - queryLastTask.getLongValue("approval_time"));
                         JSONObject nextTaskJson = new JSONObject();
                         nextTaskJson.put("process_definition_id", processInstanceId);
@@ -2651,12 +2781,41 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         long days = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - queryLastTask.getLongValue("approval_time"));
                         String taskStatusName = days == 0 ? "审批中" : "已等待" + days + "天";
                         String approvalMessage = "正在审批中...";
-                        // 获取发起人所在部门
-                        Long depId = this.getDepartmentByEmpId(token, processInstanceId);
-                        // 获取指定部门的所有上级部门（含指定部门）
-                        String upDeps = BusinessDAOUtil.getDepments(companyId, depId, 0);
-                        // 获取部门负责人
-                        List<JSONObject> upPrincipal = this.getDepartmentPrincipals(token, upDeps);
+                        String finalDeparmentId = "";
+                        StringBuilder endDepKey = new StringBuilder();
+                        endDepKey.append(companyId).append("_");
+                        endDepKey.append(processAttribute.getString("process_key")).append("_");
+                        endDepKey.append(nextTaskKey).append("_");
+                        endDepKey.append(RedisKey4Function.PROCESS_END_DEP.getIndex());
+                        String endDep = JedisClusterHelper.getValue(endDepKey.toString());
+                        if (StringUtil.isEmpty(endDep))
+                        {
+                            JSONObject endDepCache = getRedisCache("1", endDepKey.toString(), companyId);
+                            finalDeparmentId = endDepCache.getString("cache_value");
+                        }
+                        else
+                        {
+                            finalDeparmentId = endDep;
+                        }
+                        // 流程发起人
+                        StringBuilder beginUserKey = new StringBuilder();
+                        beginUserKey.append(companyId);
+                        beginUserKey.append("_");
+                        beginUserKey.append(processInstanceId);
+                        beginUserKey.append("_");
+                        beginUserKey.append(RedisKey4Function.PROCESS_BEGIN_USER.getIndex());
+                        Object object = JedisClusterHelper.get(beginUserKey.toString());
+                        JSONObject beginJson = null;
+                        if (null == object)
+                        {
+                            beginJson = getBeginUserInfo(processInstanceId, companyId);
+                        }
+                        else
+                        {
+                            beginJson = (JSONObject)object;
+                        }
+                        AssigneeServer assigneeServer = new AssigneeServer();
+                        List<String> upPrincipal = assigneeServer.getDeparmentPrincipals(companyId.toString(), finalDeparmentId, beginJson.getString("id"));
                         // 已审人员
                         StringBuilder approvalUsersKey = new StringBuilder();
                         approvalUsersKey.append(companyId).append("_");
@@ -2675,13 +2834,13 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         List<JSONObject> approverList = new ArrayList<JSONObject>();
                         
                         // 依此显示所有人
-                        for (JSONObject principal : upPrincipal)
+                        for (String principal : upPrincipal)
                         {
                             if (!StringUtil.isEmpty(approvalIds))
                             {
-                                if (!Arrays.asList(approvalIds.split(",")).contains(principal.getString("id")))
+                                if (!Arrays.asList(approvalIds.split(",")).contains(principal))
                                 {
-                                    approverList.add(this.queryAssigneeName(principal.getString("id"), companyId));
+                                    approverList.add(this.queryAssigneeName(principal, companyId));
                                 }
                                 else
                                 {
@@ -2690,7 +2849,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                             }
                             else
                             {
-                                approverList.add(this.queryAssigneeName(principal.getString("id"), companyId));
+                                approverList.add(this.queryAssigneeName(principal, companyId));
                             }
                         }
                         String assigneeId = ActivitiUtil.getTasks(companyId, processInstanceId).get(0).getAssignee();
@@ -3041,7 +3200,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject queryAssigneeName(String assignee, Long companyId)
     {
-        log.debug("end !");
+        log.debug(String.format("start ! parameters{%s,%s} ", assignee, companyId));
         JSONObject result = new JSONObject();
         try
         {
@@ -3069,7 +3228,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> queryDepartmentAssigneeName(String token, String processInstanceId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", token, processInstanceId));
         List<JSONObject> upDepartment = null;
         try
         {
@@ -3121,39 +3280,39 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private long saveProcessAttribute(JSONObject processParams, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", processParams, companyId));
         long processAttributeId = BusinessDAOUtil.getNextval4Table("process_attribute", companyId.toString());
         try
         {
             // 流程属性表
             String processAttributeTable = DAOUtil.getTableName("process_attribute", companyId);
+            List<Object> values = new ArrayList<>();
+            values.add(processAttributeId);
+            values.add(processParams.get("processKey"));
+            values.add(processParams.get("processName"));
+            values.add(processParams.getInteger("processType"));
+            values.add(processParams.get("moduleBean"));
+            values.add(processParams.get("passWay"));
+            values.add(processParams.getInteger("ownerInvisible"));
+            values.add(processParams.getInteger("remindOwner"));
+            values.add(processParams.get("processOperation"));
+            values.add(processParams.getJSONObject("approverDuplicate").getIntValue("value"));
+            values.add(0);
+            values.add(processParams.get("saveStartStatus"));
+            values.add(System.currentTimeMillis());
             // 构造新增sql
             StringBuilder insertSql = new StringBuilder();
             insertSql.append("insert into ");
             insertSql.append(processAttributeTable);
             insertSql.append(
-                "(id, process_key, process_name, process_type, module_bean, mail_pass_way, owner_invisible, remind_owner, process_operation, approver_duplicate, del_status, save_start_status, create_time) values('");
-            insertSql.append(processAttributeId);
-            insertSql.append("', '").append(processParams.get("processKey"));
-            insertSql.append("', '").append(processParams.get("processName"));
-            insertSql.append("', ").append(processParams.get("processType"));
-            insertSql.append(", '").append(processParams.get("moduleBean"));
-            insertSql.append("', ").append(processParams.get("passWay"));
-            insertSql.append(", ").append(processParams.get("ownerInvisible"));
-            insertSql.append(", ").append(processParams.get("remindOwner"));
-            insertSql.append(", '").append(processParams.get("processOperation"));
-            insertSql.append("', ").append(processParams.getJSONObject("approverDuplicate").getIntValue("value"));
-            insertSql.append(", ").append(0);
-            insertSql.append(", ").append(processParams.get("saveStartStatus"));
-            insertSql.append(", ").append(System.currentTimeMillis());
-            insertSql.append(")");
+                "(id, process_key, process_name, process_type, module_bean, mail_pass_way, owner_invisible, remind_owner, process_operation, approver_duplicate, del_status, save_start_status, create_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?)");
             // 执行sql
-            DAOUtil.executeUpdate(insertSql.toString());
+            DAOUtil.executeUpdate(insertSql.toString(), values.toArray());
         }
         catch (Exception e)
         {
             log.error(e.getMessage(), e);
-            processAttributeId = 0l;
+            processAttributeId = 0L;
         }
         log.debug("end !");
         return processAttributeId;
@@ -3161,7 +3320,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     
     private boolean saveNodeAttributeForBatch(LinkedList<Object[]> batchValList, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", batchValList, companyId));
         try
         {
             // 节点属性表
@@ -3188,9 +3347,9 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      * @return boolean
      * @Description:创建任务节点
      */
-    private Process createTaskNode(String processType, Process process, List<JSONObject> taskList)
+    private Process createTaskNode(String processType, Process process, List<JSONObject> taskList, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", processType, process, taskList, companyId));
         try
         {
             if (taskList.size() == 0)
@@ -3206,51 +3365,61 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 // 循环创建自定义节点
                 for (JSONObject taskNodeJson : taskList)
                 {
-                    String id = taskNodeJson.getString("taskKey");
-                    String name = taskNodeJson.getString("taskName");
+                    String taskKey = taskNodeJson.getString("taskKey");
+                    String taskName = taskNodeJson.getString("taskName");
                     String taskType = taskNodeJson.getString("taskType");
                     String approverType = taskNodeJson.getString("approverType");
                     String approverObj = taskNodeJson.getString("approverObj");
                     String approvalType = taskNodeJson.getString("approvalType");
-                    long approvalOver = taskNodeJson.getLongValue("approvalOver");
                     String approvalReplace = taskNodeJson.getString("approvalReplace");
                     if (taskNodeJson.get("taskType").equals("exclusiveGateway"))
                     {// 创建排他网关
-                        process.addFlowElement(ActivitiUtil.createExclusiveGateway(id));
+                        process.addFlowElement(ActivitiUtil.createExclusiveGateway(taskKey));
                     }
                     else
                     {// 创建任务节点
                         if (taskType.equals("start"))
                         {
                             // 首个任务（提交申请）
-                            process.addFlowElement(ActivitiUtil.createStarterTask(id, name));
+                            process.addFlowElement(ActivitiUtil.createStarterTask(taskKey, taskName));
                         }
                         else
                         {
                             if (approverType.equals("0"))
                             {// 0单人审批
-                                process.addFlowElement(ActivitiUtil.createUserTask(id, name, approverObj));
+                                process.addFlowElement(ActivitiUtil.createUserTask(taskKey, taskName, approverObj));
                             }
                             else if (approverType.equals("1"))
                             {// 1多人审批
-                                process.addFlowElement(ActivitiUtil.createUserTask4Multier(id, name, approverObj, approvalType.equals("0"), approvalType.equals("2")));
+                                process.addFlowElement(ActivitiUtil.createUserTask4Multier(taskKey, taskName, approverObj, approvalType.equals("0"), approvalType.equals("2")));
                             }
                             else if (approverType.equals("2"))
                             {// 2部门负责人-单级
-                                process.addFlowElement(ActivitiUtil.createUserTask4DeparmentPrincipal(id,
-                                    name,
+                                process.addFlowElement(ActivitiUtil.createUserTask4DeparmentPrincipal(taskKey,
+                                    taskName,
                                     taskNodeJson.getIntValue("approverDepartmentSingle") + 1,
                                     approvalReplace.equals("0") ? true : false));
                             }
                             else if (approverType.equals("3"))
                             {// 3部门负责人-多级
-                                process.addFlowElement(ActivitiUtil.createUserTask4MulitDeparmentPrincipal(id, name, approvalOver));
+                                process.addFlowElement(ActivitiUtil.createUserTask4MulitDeparmentPrincipal(taskKey, taskName, Long.parseLong(approverObj)));
+                                StringBuilder endDepKey = new StringBuilder();
+                                endDepKey.append(companyId).append("_");
+                                endDepKey.append(process.getId()).append("_");
+                                endDepKey.append(taskKey).append("_");
+                                endDepKey.append(RedisKey4Function.PROCESS_END_DEP.getIndex());
+                                JedisClusterHelper.set(endDepKey.toString(), approverObj);
+                                JSONObject redisCache = new JSONObject();
+                                redisCache.put("cacheType", "1");
+                                redisCache.put("cacheKey", endDepKey.toString());
+                                redisCache.put("cacheValue", approverObj);
+                                setRedisCache(redisCache, companyId);
                             }
                             else if (approverType.equals("4"))
                             {// 4指定角色
                                 if (approvalType.equals("0"))
                                 {// 从指定角色中选择一个用户
-                                    process.addFlowElement(ActivitiUtil.createUserTask4Var(id, name));
+                                    process.addFlowElement(ActivitiUtil.createUserTask4Var(taskKey, taskName));
                                 }
                                 else
                                 {// 会签、或签
@@ -3265,12 +3434,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                                     {
                                         isSingleAssign = true;
                                     }
-                                    process.addFlowElement(ActivitiUtil.createUserTask4Role(id, name, Integer.valueOf(approverObj), isSequential, isSingleAssign));
+                                    process.addFlowElement(ActivitiUtil.createUserTask4Role(taskKey, taskName, Integer.valueOf(approverObj), isSequential, isSingleAssign));
                                 }
                             }
                             else if (approverType.equals("5"))
                             {// 5发起人自己
-                                process.addFlowElement(ActivitiUtil.createStarterTask(id, name));
+                                process.addFlowElement(ActivitiUtil.createStarterTask(taskKey, taskName));
                             }
                         }
                     }
@@ -3314,14 +3483,18 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private Process createSequenceFlow(String token, Process process, JSONArray sequenceArr, JSONObject whereTaskNode, String currentBeanTable)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s,%s} ", token, process, sequenceArr, whereTaskNode, currentBeanTable));
         try
         {
             if (sequenceArr.size() == 0)
             {
                 log.warn("创建节点连接线时，未发现节点连接线！" + process);
+                log.debug("end !");
                 return process;
             }
+            // 解析token
+            InfoVo info = TokenMgr.obtainInfo(token);
+            long companyId = info.getCompanyId();
             // 节点
             List<JSONObject> emailBatchTaskWheres = new ArrayList<>();
             // 循环节点连接线
@@ -3355,15 +3528,33 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         jsonObj.put("fieldName", conditionObj.getString("field_value"));
                         jsonObj.put("operatorType", operatorValue);
                         if (showType.equals(Constant.TYPE_PICKLIST))
-                        {// 下拉框
+                        {
                             jsonObj.put("value", ((JSONObject)conditionObj.getJSONArray("result_value").get(0)).getString("value"));
                         }
                         else if (showType.equals(Constant.TYPE_PERSONNEL))
-                        {// 人员
-                            jsonObj.put("value", ((JSONObject)conditionObj.getJSONArray("result_value").get(0)).getString("id"));
+                        {
+                            JSONArray personnelArr = conditionObj.getJSONArray("result_value");
+                            if (personnelArr.size() > 1 && operatorValue.equals("EQUALS"))
+                            {
+                                jsonObj.put("value", "0");
+                            }
+                            else
+                            {
+                                jsonObj.put("value", ((JSONObject)personnelArr.get(0)).getString("id"));
+                            }
+                        }
+                        else if (showType.equals("role"))
+                        {
+                            JSONArray roleArr = conditionObj.getJSONArray("result_value");
+                            jsonObj.put("value", roleArr);
+                        }
+                        else if (showType.equals("department"))
+                        {
+                            JSONArray depArr = conditionObj.getJSONArray("result_value");
+                            jsonObj.put("value", depArr);
                         }
                         else
-                        {// 其他
+                        {
                             jsonObj.put("value", conditionObj.getString("result_value"));
                         }
                         newConditionArr.add(jsonObj);
@@ -3372,7 +3563,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     whereRelation.put("relevanceWhere", newConditionArr);
                     whereRelation.put("seniorWhere", taskNode.getString("seniorWhere"));
                     // 获取条件部分sql
-                    String sqlWhereStr = JSONParser4SQL.getSeniorWhere4Relation(whereRelation);
+                    String sqlWhereStr = JSONParser4SQL.getSeniorWhere4Relation(whereRelation, companyId);
                     if (currentBeanTable.indexOf(Constant.PROCESS_MAIL_BOX_SCOPE) != -1 && operatorValue.equals("EQUALS"))
                     {// 邮件审批(等于为或关系，不等于为并关系)
                         sqlWhereStr = sqlWhereStr.replaceAll(" and ", " or ");
@@ -3384,6 +3575,8 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     conditionSql.append("select id from ");
                     conditionSql.append(currentBeanTable);
                     conditionSql.append(" where ").append(sqlWhereStr);
+                    System.err.println("nodeId:" + taskNode.get("nodeId") + ",nodeName:" + taskNode.getString("nodeName") + " where SQL(workflow):" + conditionSql);
+                    log.info("nodeId:" + taskNode.get("nodeId") + ",nodeName:" + taskNode.getString("nodeName") + " where SQL(workflow):" + conditionSql);
                     // 创建连接线
                     process.addFlowElement(ActivitiUtil.createSequenceFlow4Sql(sequenceFlowJson.getString("sourceRef"),
                         sequenceFlowJson.getString("targetRef"),
@@ -3396,20 +3589,22 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                         ActivitiUtil.createSequenceFlow(sequenceFlowJson.getString("sourceRef"), sequenceFlowJson.getString("targetRef"), sequenceFlowJson.getString("name"), ""));
                 }
             }
-            if (null != emailBatchTaskWheres || emailBatchTaskWheres.size() != 0)
+            if (null != emailBatchTaskWheres && emailBatchTaskWheres.size() != 0)
             {
                 JSONObject asyncJSON = new JSONObject();
                 asyncJSON.put("reqJSONArray", emailBatchTaskWheres);
                 // 异步保存邮件高级条件
-                ApprovalAsyncHandle approvalHandle8 = new ApprovalAsyncHandle(token, asyncJSON);
-                approvalHandle8.asyncSaveEmailApprovalWhere();
+                AsyncHandle asyncHandle = new AsyncHandle();
+                SaveEmailApprovalWhere seaw = new SaveEmailApprovalWhere(token, asyncJSON);
+                seaw.setName("SaveEmailApprovalWhere-Thread");
+                asyncHandle.commitJob(seaw);
             }
         }
         catch (Exception e)
         {
             log.error(e.getMessage(), e);
         }
-        log.debug("start !");
+        log.debug("end !");
         return process;
     }
     
@@ -3422,6 +3617,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private boolean saveNodeFieldAuthLayout(String moduleBean, String companyId, Long processId, List<JSONObject> fieldAuthList)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", moduleBean, companyId, processId, fieldAuthList));
         Long fieldVersion = System.currentTimeMillis();
         Document saveDoc = new Document();
         saveDoc.put("companyId", companyId);
@@ -3441,11 +3637,13 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         JedisClusterHelper.set(key.toString(), fieldVersion);
         
         LayoutUtil.saveDoc(saveDoc, Constant.WORKFLOW_FIELD_AUTH_COLLECTION);
+        log.debug("end !");
         return true;
     }
     
     private JSONObject getNodeTaskMax(String companyId, String processId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", companyId, processId));
         Document queryDoc = new Document();
         queryDoc.put("companyId", companyId);
         queryDoc.put("processId", processId.toString());
@@ -3463,7 +3661,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private Long getDepartmentByEmpId(String token, String processInstanceId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", token, processInstanceId));
         Long result = null;
         try
         {
@@ -3480,6 +3678,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             JSONObject beginDeparment = DAOUtil.executeQuery4FirstJSON(querySql.toString());
             if (null == beginDeparment)
             {
+                log.debug("end !");
                 return null;
             }
             result = beginDeparment.getLong("department_id");
@@ -3500,7 +3699,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private List<JSONObject> getDepartmentPrincipals(String token, String upDeps)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", token, upDeps));
         List<JSONObject> resultList = null;
         try
         {
@@ -3540,12 +3739,13 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private JSONObject setTaskApprover(JSONObject taskParams, JSONObject tmpTask)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", taskParams, tmpTask));
         try
         {
             // 审批人类型：（0单人审批，1多人审批，2部门负责人-单级，3部门负责人-多级，4指定角色，5发起人自己）
             if (null == tmpTask.getJSONObject("approverType"))
             {
+                log.debug("end !");
                 return taskParams;
             }
             String approverType = tmpTask.getJSONObject("approverType").getString("value");
@@ -3617,7 +3817,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     
     private JSONObject getProcessApproval(Long companyId, String processInstanceId, String dataId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", companyId, processInstanceId, dataId));
         JSONObject result = null;
         try
         {
@@ -3647,7 +3847,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getProcessApprovalByBeanAndId(Long companyId, String moduleBean, Integer dataId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", companyId, moduleBean, dataId));
         JSONObject result = null;
         try
         {
@@ -3677,7 +3877,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getBusinessApprovalByBeanAndId(Long companyId, String moduleBean, Integer moduleDataId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", companyId, moduleBean, moduleDataId));
         JSONObject result = null;
         try
         {
@@ -3707,7 +3907,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONArray getNodeFieldAuthLayout(String moduleBean, String companyId, String processId, Object taskKey, String taskFieldVersion)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s,%s} ", moduleBean, companyId, processId, taskKey, taskFieldVersion));
         JSONArray resultArr = new JSONArray();
         try
         {
@@ -3770,8 +3970,10 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public boolean modifyTaskFieldAuthLayout(String token, JSONObject newEnableLayout, Long companyId, Map<String, Object> alterMap)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", token, newEnableLayout, companyId, alterMap));
         /** 字段权限版本 */
         String moduleBean = newEnableLayout.getString("bean");
+        String moduleName = newEnableLayout.getString("title");
         Long processId = newEnableLayout.getLong("processId");
         // 从历史版本中获取最新的字段权限
         JSONObject maxFieldVersion = this.getNodeTaskMax(companyId.toString(), processId.toString());
@@ -3868,13 +4070,25 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 JSONArray authArr = maxVTaskNodeJSON.getJSONArray("fieldAuth");
                 String taskKey = maxVTaskNodeJSON.getString("taskKey");
                 JSONArray newFieldAuth = new JSONArray();
+                if (authArr.size() < allFieldAuthList.size() + 1)
+                {
+                    JSONObject selectAll = (JSONObject)authArr.get(0);
+                    if (!taskKey.equals(Constant.PROCESS_FIELD_FIRST_TASK) && !taskKey.equals(Constant.PROCESS_FIELD_TASK_END))
+                    {
+                        selectAll.put("edit", "0");
+                    }
+                    newFieldAuth.add(selectAll);
+                }
                 for (JSONObject fieldAuthJSON : allFieldAuthList)
                 {
                     JSONArray existFieldAuth = (JSONArray)JSONPath.eval(authArr, "[field = '" + fieldAuthJSON.getString("field") + "']");
                     if (existFieldAuth.size() == 0)
                     {
                         JSONObject existField = (JSONObject)fieldAuthJSON.clone();
-                        existField.put("edit", taskKey.equals(Constant.PROCESS_FIELD_FIRST_TASK) ? "1" : "0");// 新增字段权限（发起节点：可见可编辑；其他节点：可见不可编辑）
+                        if (!taskKey.equals(Constant.PROCESS_FIELD_TASK_END))
+                        {
+                            existField.put("edit", taskKey.equals(Constant.PROCESS_FIELD_FIRST_TASK) ? "1" : "0");// 新增字段权限（发起节点：可见可编辑；其他节点：可见不可编辑）
+                        }
                         newFieldAuth.add(existField);
                     }
                     else
@@ -3903,6 +4117,11 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             key.append("_");
             key.append(RedisKey4Function.PROCESS_MODULE_FIELD_V.getIndex());
             JedisClusterHelper.set(key.toString(), fieldVersion);
+            JSONObject redisCache = new JSONObject();
+            redisCache.put("cacheType", "1");
+            redisCache.put("cacheKey", key.toString());
+            redisCache.put("cacheValue", fieldVersion);
+            setRedisCache(redisCache, companyId);
             
             // 修改流程审批布局
             JSONObject processLayout = getWorkflowLayout(moduleBean, token);
@@ -3940,11 +4159,13 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 modifyDoc.putAll(processLayout);
                 LayoutUtil.updateDoc(Constant.WORKFLOW_COLLECTION, prcId.toString(), modifyDoc);
             }
+            modifyProcessInfo(companyId, moduleBean, moduleName);
         }
         catch (Exception e)
         {
             log.error(e.getMessage(), e);
         }
+        log.debug("end !");
         return true;
     }
     
@@ -3958,7 +4179,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getTaskNodeCc(String processInstanceId, String taskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processInstanceId, taskKey, token));
         JSONObject result = null;
         try
         {
@@ -3992,6 +4213,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> getTaskNodeCcInfo(String processInstanceId, String taskKey, String token)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processInstanceId, taskKey, token));
         // 解析token
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
@@ -4010,10 +4232,10 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         querySql.append(ccTable);
         querySql.append(" where process_definition_id = '");
         querySql.append(processInstanceId);
-        // querySql.append("' and task_key = '");
-        // querySql.append(taskKey);
         querySql.append("')) > 0");
-        return DAOUtil.executeQuery4JSON(querySql.toString());
+        List<JSONObject> result = DAOUtil.executeQuery4JSON(querySql.toString());
+        log.debug("end !");
+        return result;
     }
     
     /**
@@ -4026,7 +4248,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public ServiceResult<String> modifyBusinessTableOfProcessStatus(String tableName, Long dataId, String status)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", tableName, dataId, status));
         ServiceResult<String> serviceResult = new ServiceResult<String>();
         serviceResult.setCodeMsg(resultCode.get("common.sucess"), resultCode.getMsgZh("common.sucess"));
         try
@@ -4063,7 +4285,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> getBtnAuth(String processOperation, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", processOperation, token));
         List<JSONObject> btnAuth = new ArrayList<JSONObject>();
         
         /**
@@ -4141,7 +4363,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getRejectType(String moduleBean, String processInstanceId, String taskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", moduleBean, processInstanceId, taskKey, token));
         JSONObject result = new JSONObject();
         try
         {
@@ -4151,7 +4373,8 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             Long companyId = info.getCompanyId();
             
             JSONObject processAttribute = this.getProcessAttributeByBean(moduleBean, token);
-            if (processAttribute.getIntValue("process_type") == 1)
+            int processType = processAttribute.getIntValue("process_type");
+            if (processType == 1)
             {// 自由流程(自由流程默认驳回到结束)
                 JSONObject rejectType = new JSONObject();
                 rejectType.put("id", 3);
@@ -4256,7 +4479,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getPassType(String moduleBean, String processInstanceId, String taskId, String taskKey, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s,%s} ", moduleBean, processInstanceId, taskId, taskKey, token));
         JSONObject result = new JSONObject();
         try
         {
@@ -4270,7 +4493,8 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             {
                 // 流程类型：0固定流程 1自由流程
                 result.put("processType", process.getIntValue("process_type"));
-                if (process.getIntValue("process_type") == 0)
+                int processType = process.getIntValue("process_type");
+                if (processType == 0)
                 {// 固定流程
                     String processDefinitionId = ActivitiUtil.getProcessDefinitionId(companyId, taskId);
                     // 获取当前节点待审批人数
@@ -4334,6 +4558,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public String getQuerySql(String moduleBean, Map<String, Object> params, Long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", moduleBean, params, companyId));
         String queryTable = DAOUtil.getTableName(moduleBean, companyId);
         StringBuilder querySql = new StringBuilder();
         querySql.append("select * from ").append(queryTable).append(" where 1=1");
@@ -4349,6 +4574,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 querySql.append(" and ").append(key).append(" = ").append(params.get(key));
             }
         }
+        log.debug("end !");
         return querySql.toString();
     }
     
@@ -4361,9 +4587,10 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> getEmployeeByRole(Long companyId, String roleId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", companyId, roleId));
         if (StringUtil.isEmpty(roleId))
         {
+            log.debug("end !");
             return new ArrayList<>();
         }
         
@@ -4395,14 +4622,17 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private int modifyBusinessData(String moduleBean, Long companyId, long dataId, String modifyDataObj)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", moduleBean, companyId, dataId, modifyDataObj));
         JSONObject modifyBusJSON = new JSONObject();
         modifyBusJSON.put("moduleBean", moduleBean);
         modifyBusJSON.put("companyId", companyId);
         modifyBusJSON.put("dataId", dataId);
         modifyBusJSON.put("modifyDataObj", modifyDataObj);
-        ApprovalAsyncHandle approvalHandle9 = new ApprovalAsyncHandle(null, modifyBusJSON);
-        approvalHandle9.asyncModifyBusinessData();
+        
+        AsyncHandle asyncHandle = new AsyncHandle();
+        ModifyBusinessData mbd = new ModifyBusinessData(null, modifyBusJSON);
+        mbd.setName("ModifyBusinessData-Thread");
+        asyncHandle.commitJob(mbd);
         log.debug("end !");
         return 0;
     }
@@ -4416,7 +4646,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private String getBusinessApprovalFlow(String dataId, String moduleBean, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", dataId, moduleBean, token));
         try
         {
             // 解析token
@@ -4445,6 +4675,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         {
             log.error(e.getMessage(), e);
         }
+        log.debug("end !");
         return null;
     }
     
@@ -4455,6 +4686,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private Document saveProcessLayout(JSONObject attrJson)
     {
+        log.debug(String.format("start ! parameters{%s} ", attrJson));
         // 移除mongoDB中的历史流程布局
         Document queryDoc = new Document();
         queryDoc.put("moduleBean", attrJson.getString("moduleBean"));
@@ -4463,7 +4695,9 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         Document saveDoc = new Document();
         saveDoc.putAll(attrJson);
         LayoutUtil.saveDoc(saveDoc, Constant.WORKFLOW_COLLECTION);
-        return LayoutUtil.findDocument(queryDoc, Constant.WORKFLOW_COLLECTION);
+        Document result = LayoutUtil.findDocument(queryDoc, Constant.WORKFLOW_COLLECTION);
+        log.debug("end !");
+        return result;
     }
     
     /**
@@ -4475,6 +4709,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private boolean processHistVersion(String moduleBean, Long companyId, String token)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", moduleBean, companyId, token));
         // 获取历史流程
         JSONObject histProcess = this.getProcessAttributeByBean(moduleBean, token);
         if (null != histProcess)
@@ -4486,15 +4721,17 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             int modifyResult = DAOUtil.executeUpdate(modifySql.toString());
             if (modifyResult < 1)
             {
+                log.debug("end !");
                 return false;
             }
         }
+        log.debug("end !");
         return true;
     }
     
     public List<JSONObject> getTaskNodeAttributeByPid(Long processId, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", processId, companyId));
         try
         {
             // 任务节点属性表
@@ -4502,6 +4739,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             StringBuilder querySql = new StringBuilder();
             querySql.append("select * from ").append(attributeTable);
             querySql.append(" where process_id = ").append(processId);
+            log.debug("end !");
             return DAOUtil.executeQuery4JSON(querySql.toString());
         }
         catch (Exception e)
@@ -4514,6 +4752,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     
     public boolean saveProcessModuleLayout(String companyId, String moduleBean, Long processId)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", companyId, processId, moduleBean));
         // 获取模块布局条件
         Document queryDoc = new Document();
         queryDoc.put("companyId", companyId);
@@ -4534,6 +4773,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         saveDoc.putAll(enableJson);
         // 新增流程模块布局
         LayoutUtil.saveDoc(saveDoc, Constant.WORKFLOW_MODULE_COLLECTION);
+        log.debug("end !");
         return true;
     }
     
@@ -4544,6 +4784,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public List<JSONObject> getEmailWhere()
     {
+        log.debug("start !");
         List<JSONObject> resultList = new ArrayList<JSONObject>();
         JSONObject result = new JSONObject();
         result.put("label", "发起人");
@@ -4563,6 +4804,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         operatorList.add(operator2);
         result.put("operator", operatorList);
         resultList.add(result);
+        log.debug("end !");
         return resultList;
     }
     
@@ -4575,6 +4817,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public boolean checkNeedApproval(JSONObject processAttribute, Long senderId, String token)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processAttribute, senderId, token));
         // 解析token
         InfoVo info = TokenMgr.obtainInfo(token);
         Long companyId = info.getCompanyId();
@@ -4610,6 +4853,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 {
                     if (StringUtil.isEmpty(userIds) && StringUtil.isEmpty(departmentId) && StringUtil.isEmpty(roleIds))
                     {
+                        log.debug("end !");
                         return false;
                     }
                     
@@ -4637,15 +4881,18 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 }
             }
             userIdsArr = idss.split(",");
-            if (operatorType.equals("EQUALS") && (!Arrays.asList(userIdsArr).contains(senderId.toString())))
+            if ("EQUALS".equals(operatorType) && (!Arrays.asList(userIdsArr).contains(senderId.toString())))
             {
+                log.debug("end !");
                 return false;
             }
-            if (operatorType.equals("NEQUALS") && (Arrays.asList(userIdsArr).contains(senderId.toString())))
+            if ("NEQUALS".equals(operatorType) && (Arrays.asList(userIdsArr).contains(senderId.toString())))
             {
+                log.debug("end !");
                 return false;
             }
         }
+        log.debug("end !");
         return true;
     }
     
@@ -4658,30 +4905,17 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject checkChooseNextApproval(String moduleBean, String token)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", moduleBean, token));
         JSONObject resultJSON = new JSONObject();
         JSONObject processAttribute = this.getProcessAttributeByBeanForCreate(moduleBean, token);
         if (processAttribute == null)
         {
             resultJSON.put("processType", Constant.CURRENCY_TWO);
+            log.debug("end !");
             return resultJSON;
         }
         resultJSON.put("processType", processAttribute.getInteger("process_type"));
-        
-        // 解析token
-        InfoVo info = TokenMgr.obtainInfo(token);
-        Long companyId = info.getCompanyId();
-        JSONObject taskJson = this.getNextTaskNodeAttributeByPid(processAttribute.getString("id"), Constant.PROCESS_FIELD_FIRST_TASK, token);
-        if (null != taskJson && taskJson.getString("approver_type").equals("4") && taskJson.getString("approval_type").equals("0"))
-        {
-            List<JSONObject> users = this.getEmployeeByRole(companyId, taskJson.getString("approver_obj"));
-            resultJSON.put("choosePersonnel", null == users ? new ArrayList<>() : users);
-        }
-        else
-        {
-            resultJSON.put("choosePersonnel", new ArrayList<>());
-        }
-        String processOperation = processAttribute.getString("process_operation");
-        resultJSON.put("ccTo", StringUtil.isEmpty(processOperation) ? 0 : processOperation.indexOf("4") == -1 ? 0 : 1);
+        log.debug("end !");
         return resultJSON;
     }
     
@@ -4694,6 +4928,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getBeginUserInfo(String processInstanceId, long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", processInstanceId, companyId));
         JSONObject result = null;
         try
         {
@@ -4721,6 +4956,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         {
             log.error(e.getMessage(), e);
         }
+        log.debug("end !");
         return result;
     }
     
@@ -4733,10 +4969,13 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getFieldV(String companyId, String processId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", companyId, processId));
         Document queryDoc = new Document();
         queryDoc.put("companyId", companyId);
         queryDoc.put("processId", processId);
-        return LayoutUtil.findDoc(queryDoc, Constant.WORKFLOW_FIELD_AUTH_COLLECTION);
+        JSONObject result = LayoutUtil.findDoc(queryDoc, Constant.WORKFLOW_FIELD_AUTH_COLLECTION);
+        log.debug("end !");
+        return result;
     }
     
     /**
@@ -4748,6 +4987,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public String getProcessName(String companyId, String processInstanceId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", companyId, processInstanceId));
         StringBuilder querySql = new StringBuilder();
         querySql.append("select p2.process_name from process_approval_");
         querySql.append(companyId);
@@ -4757,6 +4997,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         querySql.append(processInstanceId);
         querySql.append("'");
         Object processName = DAOUtil.executeQuery4Object(querySql.toString());
+        log.debug("end !");
         return processName.toString();
     }
     
@@ -4769,35 +5010,43 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public boolean setRedisCache(JSONObject valuesJson, long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", valuesJson, companyId));
+        String cacheType = valuesJson.getString("cacheType");
+        String cacheKey = valuesJson.getString("cacheKey");
+        if (StringUtil.isEmpty(cacheKey) || StringUtil.isEmpty(cacheType))
+        {
+            return false;
+        }
+        
         String redisCacheTable = DAOUtil.getTableName("redis_cache_keys", companyId);
         StringBuilder delSB = new StringBuilder();
         delSB.append("delete from ");
         delSB.append(redisCacheTable);
         delSB.append(" where cache_type = '");
-        delSB.append(valuesJson.getString("cacheType"));
+        delSB.append(cacheType);
         delSB.append("'");
         delSB.append(" and cache_key = '");
-        delSB.append(valuesJson.getString("cacheKey"));
+        delSB.append(cacheKey);
         delSB.append("'");
         DAOUtil.executeUpdate(delSB.toString());
         
+        List<Object> values = new ArrayList<>();
+        values.add(BusinessDAOUtil.getNextval4Table("redis_cache_keys", companyId));
+        values.add(cacheType);
+        values.add(cacheKey);
+        values.add(valuesJson.getString("cacheValue"));
+        values.add(System.currentTimeMillis());
         StringBuilder insertSB = new StringBuilder();
         insertSB.append("insert into ");
         insertSB.append(redisCacheTable);
-        insertSB.append(" values('");
-        insertSB.append(valuesJson.getString("cacheType"));
-        insertSB.append("', '");
-        insertSB.append(valuesJson.getString("cacheKey"));
-        insertSB.append("', '");
-        insertSB.append(valuesJson.getString("cacheValue"));
-        insertSB.append("', ");
-        insertSB.append(System.currentTimeMillis());
-        insertSB.append(")");
-        int result = DAOUtil.executeUpdate(insertSB.toString());
+        insertSB.append("(id,cache_type,cache_key,cache_value,create_time) values(?,?,?,?,?)");
+        int result = DAOUtil.executeUpdate(insertSB.toString(), values.toArray());
         if (result < 1)
         {
+            log.debug("end !");
             return false;
         }
+        log.debug("end !");
         return true;
     }
     
@@ -4810,6 +5059,11 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     @Override
     public JSONObject getRedisCache(String cacheType, String cacheKey, long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", cacheType, cacheKey, companyId));
+        if (StringUtil.isEmpty(cacheType) || StringUtil.isEmpty(cacheKey) || companyId < 1)
+        {
+            return null;
+        }
         StringBuilder querySB = new StringBuilder();
         querySB.append("select * from redis_cache_keys_");
         querySB.append(companyId);
@@ -4819,11 +5073,14 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         querySB.append("' and cache_key = '");
         querySB.append(cacheKey);
         querySB.append("'");
-        return DAOUtil.executeQuery4FirstJSON(querySB.toString());
+        JSONObject result = DAOUtil.executeQuery4FirstJSON(querySB.toString());
+        log.debug("end !");
+        return result;
     }
     
     private Map<String, List<String>> buildSequnce(JSONArray sequenceArr)
     {
+        log.debug(String.format("start ! parameters{%s} ", sequenceArr));
         Map<String, List<String>> sequenceMap = new HashMap<String, List<String>>();
         for (Object sequenceObj : sequenceArr)
         {
@@ -4844,6 +5101,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 // sequenceMap.put(sourceRef, refList);
             }
         }
+        log.debug("end !");
         return sequenceMap;
     }
     
@@ -4855,7 +5113,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private static boolean removeApprovedTask(String processInstanceId, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", processInstanceId, companyId));
         try
         {
             // 保存审批记录
@@ -4870,6 +5128,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             
             if (result < 1)
             {
+                log.debug("end !");
                 return false;
             }
         }
@@ -4889,7 +5148,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private static boolean modifyLaunchTime(String moduleBean, String processInstanceId, long dataId, long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s} ", moduleBean, processInstanceId, dataId, companyId));
         try
         {
             Long newCreateTime = System.currentTimeMillis();
@@ -4926,7 +5185,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private boolean saveApprovedTaskExecuteSql(JSONObject saveJson, Long companyId)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s} ", saveJson, companyId));
         try
         {
             // 保存审批记录
@@ -4954,6 +5213,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
             
             if (result < 1)
             {
+                log.debug("end !");
                 return false;
             }
         }
@@ -4976,7 +5236,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private boolean insertBusinessData(Long companyId, String moduleBean, long dataId, long businessDataId, String token)
     {
-        log.debug("start !");
+        log.debug(String.format("start ! parameters{%s,%s,%s,%s,%s} ", companyId, moduleBean, dataId, businessDataId, token));
         try
         {
             RabbitMQServer rabbitMQServer = new RabbitMQServer();
@@ -5014,6 +5274,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 int insertResult = DAOUtil.executeUpdate(insertSql.toString());
                 if (insertResult < 1)
                 {
+                    log.debug("end !");
                     return false;
                 }
                 // 生成子表单
@@ -5086,7 +5347,6 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                     obj.put("trigger", 0);
                     obj.put("id", idArray);
                     rabbitMQServer.sendMessage("allot", obj.toString());
-                    JobManager.getInstance().submitJob(new FirstThread());
                 }
             }
         }
@@ -5100,11 +5360,12 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
     
     /**
      * @param prcessInstId
-     * @return
-     * @Description:流程是否正常结束
+     * @return boolean
+     * @Description:流程是否正常结束(未调用，保留)
      */
     private boolean checkExistEndEvent(String prcessInstId, long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", prcessInstId, companyId));
         boolean result = false;
         StringBuilder queryHistoryTask = new StringBuilder();
         queryHistoryTask.append("select id_, proc_def_id_, proc_inst_id_, task_def_key_, name_, assignee_ From ");
@@ -5119,6 +5380,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 break;
             }
         }
+        log.debug("end !");
         return result;
     }
     
@@ -5131,6 +5393,7 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
      */
     private List<JSONObject> getApprovalFinshedTask(String processInstanceId, int processType, long companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s,%s} ", processInstanceId, processType, companyId));
         String processFlowTable = DAOUtil.getTableName("process_whole_flow", companyId);
         String employeeTable = DAOUtil.getTableName("employee", companyId);
         String postTable = DAOUtil.getTableName("post", companyId);
@@ -5144,11 +5407,14 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
         querySql.append("where t4.process_definition_id = '");
         querySql.append(processInstanceId).append("' order by t4.approval_time ");
         // 获取已审批任务
-        return DAOUtil.executeQuery4JSON(querySql.toString());
+        List<JSONObject> result = DAOUtil.executeQuery4JSON(querySql.toString());
+        log.debug("end !");
+        return result;
     }
     
     private void genrateApprovalTable(String beanName, String companyId)
     {
+        log.debug(String.format("start ! parameters{%s,%s} ", beanName, companyId));
         StringBuilder tablesSB = new StringBuilder("select * from pg_tables where tableowner = 'hjhq'");
         tablesSB.append(" and tablename like '").append(beanName).append("%").append(companyId).append("'");
         List<JSONObject> tableList = DAOUtil.executeQuery4JSON(tablesSB.toString());
@@ -5164,5 +5430,6 @@ public class WorkflowAppServiceImpl implements WorkflowAppService
                 log.debug(beanName.concat("-生成模块审批流程详情表失败！"));
             }
         }
+        log.debug("end !");
     }
 }

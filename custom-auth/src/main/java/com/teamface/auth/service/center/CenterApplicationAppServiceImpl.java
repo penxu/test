@@ -180,9 +180,16 @@ public class CenterApplicationAppServiceImpl implements CenterApplicationAppServ
                 .append(layoutJson.getString("charge_type"))
                 .append("',payment_type ='")
                 .append(layoutJson.getString("payment_type"))
-                .append("',price ='")
-                .append(layoutJson.getString("price"))
-                .append("',receiv_account ='")
+                .append("',price =");
+            if (layoutJson.getString("price") == null || layoutJson.getString("price").isEmpty())
+            {
+                builder.append("null");
+            }
+            else
+            {
+                builder.append("'").append(layoutJson.getString("price").replace("'", "''")).append("'");
+            }
+            builder.append(",receiv_account ='")
                 .append(layoutJson.getString("receiv_account"))
                 .append("',function_remark ='")
                 .append(layoutJson.getString("function_remark"))
@@ -486,9 +493,16 @@ public class CenterApplicationAppServiceImpl implements CenterApplicationAppServ
                 .append(layoutJson.getString("charge_type"))
                 .append("',payment_type ='")
                 .append(layoutJson.getString("payment_type"))
-                .append("',price ='")
-                .append(layoutJson.getString("price"))
-                .append("',receiv_account ='")
+                .append("',price =");
+            if (layoutJson.getString("price") == null || layoutJson.getString("price").isEmpty())
+            {
+                builder.append("null");
+            }
+            else
+            {
+                builder.append("'").append(layoutJson.getString("price").replace("'", "''")).append("'");
+            }
+            builder.append(",receiv_account ='")
                 .append(layoutJson.getString("receiv_account"))
                 .append("',function_remark ='")
                 .append(layoutJson.getString("function_remark"))
@@ -575,9 +589,16 @@ public class CenterApplicationAppServiceImpl implements CenterApplicationAppServ
                 .append(layoutJson.getString("charge_type"))
                 .append("', payment_type ='")
                 .append(layoutJson.getString("payment_type"))
-                .append("', price ='")
-                .append(layoutJson.getDouble("price"))
-                .append("',receiv_account ='")
+                .append("', price =");
+            if (layoutJson.getString("price") == null || layoutJson.getString("price").isEmpty())
+            {
+                builder.append("null");
+            }
+            else
+            {
+                builder.append("'").append(layoutJson.getString("price").replace("'", "''")).append("'");
+            }
+            builder.append(",receiv_account ='")
                 .append(layoutJson.getString("receiv_account"))
                 .append("',function_remark ='")
                 .append(layoutJson.getString("function_remark"))

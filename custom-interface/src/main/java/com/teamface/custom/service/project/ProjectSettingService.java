@@ -87,4 +87,20 @@ public interface ProjectSettingService
      */
     public List<JSONObject> queryLabelsList(String token, Long id, Integer type, String keyword);
     
+    /**
+     * @param token
+     * @param jsonStr
+     * @return
+     * @Description:
+     */
+    public ServiceResult<String> editProgress(String token, String jsonStr);
+    
+    /**
+     * @param token
+     * @param jsonStr
+     * @return
+     * @Description:
+     */
+    public ServiceResult<String> editTaskSort(String token, String jsonStr);
+    
 }

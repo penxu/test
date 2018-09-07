@@ -1,0 +1,593 @@
+/**
+ * app组件样式
+ **/
+.components-app{
+  display: inline-block;
+  width: 100%;
+  .component-item{
+    display: flex;
+    position: relative;
+    line-height: 64px;
+    border-bottom: 1px solid #E7E7E7;
+    >label{
+      flex: 0 0 100px;
+      margin: 0 10px 0 0;
+      color: #797979;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      .required-box{
+        display: inline-block;
+        width: 10px;
+      }
+    }
+    >.el-input,.el-date-picker{
+      flex: 1;
+      color: #424242;
+      input{
+        color: inherit;
+        background: transparent;
+        border: none;
+      }
+    }
+    >.el-textarea{
+      color: #17171A;
+      textarea{
+        padding: 5px;
+        color: inherit;
+        background: transparent;
+        border: none;
+        resize: none;
+      }
+    }
+    >.el-select{
+      flex: 1;
+      padding: 0 30px 0 0;
+      input{
+        color: inherit;
+        background: transparent;
+      }
+    }
+    >.picklist-box{
+      flex: 1;
+      padding: 10px 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-content: center;
+      >span{
+        position: relative;
+        display: inline-block;
+        max-width:150px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 13px;
+        color: #FFFFFF;
+        padding: 0 8px;
+        margin: 0 8px 5px 0 ;
+        border-radius: 100px;
+        text-align: center;
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .white-font{
+        color: #5A676E;
+        margin: 0;
+        &:last-child{
+          &::after{
+            content: '';
+            position: absolute;
+            right: 0px;
+          }
+        }
+        &::after{
+          content: '/';
+          position: absolute;
+          right: 0px;
+        }
+      }
+    }
+    >.area-box{
+      input{
+        padding: 0 30px 0 0;
+      }
+    }
+    >.people-box{
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-content: center;
+      .people-add{
+        width: 30px;
+        height: 40px;
+        padding: 5px 0 5px 5px;
+        line-height: 40px;
+        >.iconfont{
+          line-height: 32px;
+          font-size: 30px;
+          color: #ACB8C5;
+          cursor: pointer;
+        }
+      }
+      .people-item{
+        position: relative;
+        flex: 0 0 40px;
+        height: 40px;
+        padding: 5px;
+        &:hover{
+          >i.el-icon-circle-close{
+            visibility: visible;
+          }  
+        }
+        >i.el-icon-circle-close{
+          position: absolute;
+          visibility: hidden;
+          right: -5px;
+          top: -5px;
+          font-size: 12px;
+          color: #F94C4A;
+          cursor: pointer;
+        }
+      }
+    }
+    >.attachment-box{
+      flex: 1;
+      padding: 0 30px 0 0;
+      .upload-button{
+        label{
+          display: inline-block;
+          width: 30px;
+          height: 30px;
+          line-height: 30px;
+          text-align: center;
+          border: 1px solid #D9D9D9;
+          border-radius: 50%;
+          color: #797979;
+          background: #ECEFF1;
+          cursor: pointer;
+          input{
+            display: none;
+          }
+        }
+        i{
+          font-size: 16px;
+          color: #ACB8C5;
+        }
+      }
+      .attachment-list{
+        .attachment-box{
+          position: relative;
+          >.el-icon-circle-close{
+            position: absolute;
+            left: 25px;
+            top: 0px;
+            font-size: 12px;
+            color: #F94C4A;
+            cursor: pointer;
+          }
+        }
+      }
+      .picture-list{
+        .item{
+          position: relative;
+          height: 40px;
+          line-height: 40px;
+          margin: 0 0 5px 0;
+          img{
+            width: 40px;
+            max-height: 40px;
+            margin: 0 10px 0 0;
+            vertical-align: top;
+          }
+          >span{
+            display: inline-block;
+            width: 125px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          >.el-icon-circle-close{
+            position: absolute;
+            right: -20px;
+            top: 10px;
+            font-size: 12px;
+            color: #F94C4A;
+            cursor: pointer;
+          }
+        }
+      }
+    }
+    >.el-checkbox-group{
+      flex: 1;
+      .el-checkbox {
+        margin: 0 14px 0 0;
+      }
+    }
+    >.el-radio-group{
+      flex: 1;
+      margin: 12px 0 0 0;
+      .el-radio {
+        margin: 0 14px 25px 0;
+      }
+    }
+    >.select-group{
+      display: flex;
+      padding: 0 20px 0 0;
+      .el-select{
+        flex: 1;
+        width: auto;
+        margin: 0 10px 0 0;
+        input{
+          color: inherit;
+          background: transparent;
+          height: 35px;
+          line-height: 35px;
+        }
+      }
+    }
+    >.subform-box.height-double{
+      >.list{
+        .item{
+          height: 82px;
+        }
+      }
+    }
+    >.subform-box{
+      flex: 1;
+      margin: 0 30px 0 0;
+      overflow-x: auto;
+      border: 1px solid #D9D9D9;
+      >.title{
+        display: flex;
+        height: 34px;
+        line-height: 34px;
+        span{
+          display: block;
+          min-width: 140px;
+          padding: 0 10px;
+          font-size: 13px;
+          color: #17171A;
+          background: #F5F5F5;
+          border-right: 1px solid #D9D9D9;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          &:last-child{
+            border-right-color: transparent;
+          }
+        }
+      }
+      >.list{
+        display: flex;
+        line-height: 40px;
+        padding: 0;
+        .item.border-line{
+          min-width: 250px;
+          border: 1px solid #51D0B1
+        }
+        .item{
+          position: relative;
+          border-top: 1px solid #D9D9D9;
+          border-left: 1px solid #D9D9D9;
+          display: block;
+          min-width: 140px;
+          height: 42px;
+          overflow: auto;
+          &:first-child{
+            border-left: none;
+            margin: 0 0 0 -1px;
+          }
+          .el-select{
+            width: 100%;
+          }
+          .el-input ,.el-date-picker,.el-textarea{
+            width: 100%;
+            outline: none;
+            input{
+              outline: none;
+              border-color: transparent;
+              font-size: 14px;
+              color: #4A4A4A;
+            }
+            textarea{
+              height: 80px !important;
+              outline: none;
+              border-color: transparent;
+              font-size: 14px;
+              color: #4A4A4A;
+            }
+            .el-icon-date,.el-icon-circle-close{
+              margin: -5px 0 0 0;
+            }
+            .el-input__suffix{
+              right: 10px;
+            }
+          }
+          .attachment-box{
+            .upload-button{
+              line-height: 40px;
+              padding: 0 0 0 10px;
+              label{
+                cursor: pointer;
+                input{
+                  display: none;
+                }
+              }
+              i{
+                color: #797979;
+                vertical-align: middle;
+                margin: 0 5px 0 0;
+              }
+              span{
+                color: #797979;
+              }
+            }
+            .attachment-show{
+              position: relative;
+              padding: 0 0 0 10px;
+              >i{
+                position: absolute;
+                left: 35px;
+                top: 0;
+                font-size: 12px;
+                color: #F94C4A;
+                cursor: pointer;
+              }
+            }
+            .picture{
+              position: relative;
+              display: inline-block;
+              padding: 0 0 0 10px;
+              >img{
+                width: 36px;
+                height: 36px;
+              }
+              >i{
+                position: absolute;
+                right: -5px;
+                top: 0;
+                font-size: 12px;
+                color: #F94C4A;
+                cursor: pointer;
+              }
+            }
+          }
+          .people-box{
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px 0 0 10px;
+            .people-add{
+              width: 30px;
+              height: 32px;
+              >.iconfont{
+                line-height: 32px;
+                font-size: 30px;
+                color: #ACB8C5;
+                cursor: pointer;
+              }
+            }
+            .people-item{
+              position: relative;
+              margin: 0 10px 10px 0;
+              &:hover{
+                >i.el-icon-circle-close{
+                  visibility: visible;
+                }  
+              }
+              >i.el-icon-circle-close{
+                position: absolute;
+                visibility: hidden;
+                right: -10px;
+                top: -5px;
+                font-size: 12px;
+                color: #F94C4A;
+                cursor: pointer;
+              }
+            }
+          }
+          .location-box{
+            position: relative;
+            >.el-input{
+              padding: 0 10px 0 0;
+            }
+            i{
+              position: absolute;
+              top: 0;
+              right: 5px;
+              font-size: 16px;
+              color: #D8D8D8;
+              cursor: pointer;
+            }
+          }
+          .reference-box{
+            position: relative;
+            i{
+              position: absolute;
+              top: 0;
+              right: 5px;
+              font-size: 20px;
+              color: #979797;;
+              cursor: pointer;
+            }
+          }
+          .button-icon{
+            position: absolute;
+            right: 0;
+            top: 0;
+          }
+        }
+        .delete{
+          position: absolute;
+          right: -5px;
+          width: 20px;
+          height: 20px;
+          line-height: 20px;
+          text-align: center;
+          margin: 15px 0 0 0;
+          border-radius: 50%;
+          background: #FFFFFF;
+          cursor: pointer;
+          box-shadow: -1px 1px 2px 0 rgba(155,155,155,0.30), 1px -1px 2px 0 rgba(155,155,155,0.20);
+          i{
+            font-size: 12px;
+            color: #F94C4A;
+          }
+        }
+      }
+    }
+    .icon-button{
+      width: 20px;
+      padding: 0 5px;
+      box-sizing: content-box;
+      cursor: pointer;
+      >span{
+        i{
+          font-size: 18px;
+          color: #B3B4BA;
+          cursor: pointer;
+          vertical-align: middle;
+        }
+      }
+      .iconfont{
+        font-size: 18px;
+        color: #B3B4BA;
+        cursor: pointer;
+      }
+    }
+    .clear-content{
+      position: absolute;
+      right: 40px;
+      top: 25px;
+      color: #B3B4BA;
+      cursor: pointer;
+    }
+    .error-p{
+      display: none;
+    }
+    >.app-alert-top{
+      position: fixed;
+      width: 350px;
+      height: 611px;
+      padding: 0;
+      background: #EFEFF4;
+      z-index: 9;
+      .app-area-box{
+        background: #FFFFFF;
+        width: 100%;
+        >.title{
+          height: 44px;
+          line-height: 44px;
+          font-size: 20px;
+          color: #17171A;
+          border-bottom: 1px solid #E7E7E7;
+          .button-back{
+            color: #51D0B1;
+            font-size: 16px;
+            margin: 0 80px 0 5px;
+            cursor: pointer;
+            >i{
+              font-size: 16px;
+              margin: 0 5px 0 0;
+            }
+          }
+          .button-commit{
+            float: right;
+            font-size: 16px;
+            color: #51D0B1;
+            padding: 0 15px;
+            cursor: pointer;
+          }
+        }
+        >.pick-content{
+          width: 100%;
+          .el-radio,.el-checkbox{
+            display: block;
+            margin: 0 15px;
+            height: 54px;
+            line-height: 54px;
+            border-bottom: 1px solid #E7E7E7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            &:last-child{
+              border: none;
+            }
+            .el-radio__input,.el-checkbox__input{
+              float: right;
+              margin: 19px 0;
+            }
+          }
+        }
+      }
+    }
+  }
+  .component-item.top-bottom{
+    display: block;
+    line-height: normal;
+    >label{
+      display: block;
+      height: 24px;
+      line-height: 24px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    >.el-input{
+      width: calc(100% - 30px);
+      line-height: 40px;
+    }
+    >.el-textarea,>.el-select,>.people-box,>.attachment-box{
+      width: calc(100% - 30px);
+      line-height: 40px;
+      padding: 0;
+    }
+    >.attachment-box{
+      width: calc(100% - 30px);
+      line-height: 40px;
+      padding: 0 10px;
+    }
+    >.el-textarea{
+      width: 100%;
+      padding: 0 0 0 15px;
+    }
+    >.el-checkbox-group,>.el-radio-group{
+      width: calc(100% - 30px);
+      line-height: 40px;
+    }
+    >.area-box{
+      input{
+        padding: 0 30px 0 15px;
+      }
+    }
+    >.picklist-box{
+      display: inline-block;
+      width: calc(100% - 30px)
+    }
+    >.select-group{
+      width: calc(100% - 30px);
+      line-height: 40px;
+      padding: 0 ;
+    }
+    >.subform-box{
+      width: calc(100% - 30px);
+    }
+    .icon-button{
+      float: right;
+      width: 20px;
+      line-height: 40px;
+      padding: 0 5px;
+      .iconfont{
+        font-size: 18px;
+        color: #B3B4BA;
+        cursor: pointer;
+      }
+    }
+    .clear-content{
+      top: 35px;
+    }
+  }
+}

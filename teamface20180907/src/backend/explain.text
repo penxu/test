@@ -1,0 +1,12 @@
+1.本模块存放web后台管理系统界面
+2.main-backend.vue是本模块主界面
+  1> application              // 应用中心
+  2> custom                   // 自定义管理
+  3> employee                 // 成员管理
+  4> enterprise               // 企业管理
+  5> integration              // 接口集成
+  6> module_setting           // 基础模块设置
+  7> personal_setting         // 个人设置
+  8> recycle                  // 回收站
+  9> role                     // 角色管理
+  10> safety                  // 安全管理

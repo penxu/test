@@ -1,0 +1,11 @@
+本模块存放各类公共文件
+  1.alert: 存放公共弹框组件
+  2.component: 存放公共组件
+  3.layout: 存放自定义布局组件
+  4.js: 存放公共js
+    1> ajax.js // 封装的ajax方法
+    2> bus.js // 事件总线处理器
+    3> port.js // 后台接口URL
+    4> area.js // 省市区json
+    5> tool.js // 工具类
+    6> constant // 常量类

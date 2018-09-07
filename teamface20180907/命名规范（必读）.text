@@ -1,0 +1,52 @@
+1.SRC文件夹下的每个文件代表一个模块
+2.每个模块存放该模块下所有的组件。
+3.模块下每个文件必须是该模块路由下的子路由
+4.命名格式，例：
+    文件夹名：xxxx 或 xxx_xx; (尽量一个单词)
+    组件：xxx.vue 或 xxx-xxx.vue (尽量不要用一个单词);
+5.每一个组件必须命名name属性，并且全局不能重复
+    格式：Xxxx 或 XxxxXxxXxxxx
+6.组件内引用其它组件，例：
+    引入：1.import draggable from 'vuedraggable' (第三方插件)
+         2.import XxxxXxx from '@/xx/xxxx' (本地组件)
+    使用：1.<draggable></draggable> (第三方插件)
+         2.<xxxx-xxx></xxxx-xxx> (本地组件)
+7.组件内常用生命周期钩子及方法顺序示例   
+    components ：组件
+    props ： 尽量带上type属性
+    data ： 先初始化
+    created ：不要在这里面写方法
+    mounted ：不要在这里面写方法
+    metods ：方法写在这里面，驼峰命名
+    filter ：过滤器，全局的放在filter文件下
+    computed ：计算属性要多使用，肯定比你转来转去的简单
+    watch ： 监听属性变化,两个参数（newVal,oldVal）
+8. 样式篇 (*****非常重要，必须遵守*****)
+    1> 本项目使用sass预处理器 
+    2> 每个组件的最外层div必须命名一个全局不重复的class 例如：
+      A: module-list组件内的class可定义为module-list-wrap (长度无所谓，一定要保证唯一性) 
+      B: 组件内所有的样式必须写在该class的下面 （除非使用scoped属性定义私有）
+    3> 外部样式统一写在static下的css内
+9. 封装
+    1> 凡是可复用的UI，必须封装成组件。
+    2> 复杂的界面，酌情封装成组件，方便维护
+    3> 组件的存放位置根据使用模块确定
+    4> 公用组件的命名不要和某一模块下的组件类似，要有独立性，简单易懂
+10. bus的使用
+    bus已经封装，使用方法：
+       1> this.$bus.emit('add',num)    // 发送 
+       2> this.$bus.on('add',num => {
+            console.log(num)
+          })                           // 接收 
+       3> beforeDestroy () {
+            this.$bus.off('add',num)   // 销毁 
+          }
+    *注意： 使用bus功能的必须在beforeDestroy生命周期里销毁  
+11. 网络请求
+    1> 先在port.js文件中引入后台接口路径。
+    2> 然后在ajax.js文件中写入具体请求方法。
+    3> 使用时在组件中引入 import {HTTPServer} from '@/common/js/ajax.js'
+    *注意： 添加接口路径和请求方法时必须搜索当前文件的URL看是否有人写过该请求，防止代码冗余
+12. 注释
+    1> 每个方法必须写注释解释其作用
+    2> 方法内复杂逻辑重要步骤尽量写注释，方便以后维护。    

@@ -1,0 +1,143 @@
+.common-dialog{
+  .el-dialog__header{
+    height: 50px;
+    line-height: 50px;
+    padding: 0 20px;
+    border-bottom: 1px solid #D8D8D8;
+    .el-dialog__title{
+      font-size: 16px;
+      color: #17171A;
+      vertical-align: text-top;
+    }
+    .el-dialog__close{
+      font-size: 20px;
+    }
+  }
+  .el-dialog__body{
+    padding: 20px;
+  }
+  .el-dialog__footer{
+    height: 52px;
+    line-height: 52px;
+    padding: 0 20px;
+    border-top: 1px solid #D8D8D8;
+    .el-button{
+      padding: 8px 15px;
+    }
+    a.text{
+      float: left;
+      font-size: 14px;
+      color: #008FE5;
+      cursor: pointer;
+    }
+  }
+}
+/**
+  2018-6-21 提示框
+*/
+.prompt-dialog{
+  .el-dialog{
+    width: 400px;
+    padding: 20px;
+    position: absolute;
+    left: calc(50% - 200px);
+    top: calc(50% - 120px);
+    margin: 0!important;
+    .el-dialog__header{
+      display: none;
+    }
+    .el-dialog__body{
+      padding: 10px 0 40px 10px;
+      .content{
+        font-size: 16px;
+        color: rgba(0,0,0,0.85);
+        line-height: 24px;
+        .iconfont{
+          color: #FAAD14;
+          margin-right: 16px;
+          font-size: 22px;
+          float: left;
+        }
+        .remark{
+          font-size: 14px;
+          color: #666;
+          padding-left: 38px;
+          margin-top: 10px;
+          line-height: 20px;
+        }
+      }
+    }
+    .el-dialog__footer{
+      padding: 0;
+      .el-button{
+        padding: 8px 18px;
+      }
+    }
+  }
+}
+.prompt-dialog2{
+  .el-dialog{
+    width: 400px;
+    position: absolute;
+    left: calc(50% - 200px);
+    top: calc(50% - 120px);
+    margin: 0!important;
+    .el-dialog__body{
+      padding: 20px 20px 56px;
+      .content{
+        font-size: 16px;
+        color: #424242;
+        letter-spacing: 0;
+        line-height: 26px;
+      }
+    }
+    .el-dialog__footer{
+      padding: 10px 20px;
+      .el-button{
+        padding: 8px 18px;
+      }
+    }
+  }
+}
+/**
+  2018-6-21 添加窗口
+*/
+.add-dialog{
+  .el-dialog__header{
+    padding: 16px 20px 10px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  .el-dialog__footer{
+    padding: 10px 20px 10px;
+    border-top: 1px solid #e5e5e5;
+    .el-button{
+      padding: 8px 18px;
+    }
+  }
+  .el-form-item{
+    .err{
+      position: absolute;
+      bottom: -18px;
+      left: 0;
+      line-height: 1;
+      font-size: 12px;
+      color: red;
+      .iconfont{
+        font-size: 12px;
+        margin: 0 3px 0 10px;
+      }
+    }
+    .el-select{
+      width: 100%;
+    }
+  }
+  .must{
+    .el-form-item__label::before{
+      content: "*";
+      display: inline-block;
+      color: red;
+      line-height: 1;
+      margin: 0 5px 0 0;
+    }
+  }
+}
